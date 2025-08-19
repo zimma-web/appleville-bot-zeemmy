@@ -53,7 +53,7 @@
     }
 
     // =========================
-    // AppleVille Bot — Fixed Input Version
+    // AppleVille Bot — Fixed Purchase Version
     // =========================
 
     // ====== CONFIG ======
@@ -67,6 +67,8 @@
     const ITEM_TYPE = 'SEED';
     const MODIFIER_TYPE = 'MODIFIER';
     const PAUSE_MS = 150;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 2000;
 
     // ====== IMPROVED COOKIE HANDLER ======
     const fs = require('fs');
@@ -78,7 +80,6 @@
 
     // Clean readline interface
     function createCleanReadline() {
-        // Clear any existing input
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(false);
         }
@@ -87,7 +88,7 @@
             input: process.stdin,
             output: process.stdout,
             terminal: true,
-            historySize: 0 // Disable history
+            historySize: 0
         });
 
         return rl;
@@ -95,7 +96,6 @@
 
     // Improved cookie input with better paste handling
     async function ensureCookieInteractive() {
-        // Try to read existing cookie
         try {
             COOKIE = fs.readFileSync(COOKIE_FILE, 'utf8').trim();
             if (COOKIE && !COOKIE.includes('PASTE') && COOKIE.length > 20) {
@@ -116,7 +116,6 @@
             console.log('3. Tekan F12 → Tab Application → Cookies');
             console.log('4. Copy semua cookies\n');
 
-            // Simple prompt with better handling
             const cookieInput = await new Promise((resolve, reject) => {
                 console.log('📋 Paste cookie di bawah ini lalu tekan ENTER:');
                 console.log('─'.repeat(50));
@@ -126,16 +125,15 @@
                     if (!inputReceived) {
                         reject(new Error('Timeout - tidak ada input dalam 2 menit'));
                     }
-                }, 120000); // 2 minutes timeout
+                }, 120000);
 
                 rl.once('line', (input) => {
                     inputReceived = true;
                     clearTimeout(timeout);
 
-                    // Clean the input
                     const cleaned = input
-                        .replace(/\r?\n/g, '') // Remove newlines
-                        .replace(/\s+/g, ' ')   // Normalize spaces
+                        .replace(/\r?\n/g, '')
+                        .replace(/\s+/g, ' ')
                         .trim();
 
                     resolve(cleaned);
@@ -144,7 +142,6 @@
 
             rl.close();
 
-            // Validate cookie
             if (!cookieInput || cookieInput.length < 20) {
                 throw new Error('Cookie terlalu pendek atau kosong');
             }
@@ -153,7 +150,6 @@
                 throw new Error('Format cookie tidak valid - harus mengandung "="');
             }
 
-            // Save cookie
             try {
                 fs.writeFileSync(COOKIE_FILE, cookieInput + '\n', 'utf8');
                 console.log('✅ Cookie berhasil disimpan ke akun.txt\n');
@@ -168,7 +164,6 @@
             rl.close();
             console.error(`❌ Error: ${error.message}\n`);
 
-            // Offer alternative method
             console.log('🔄 Metode alternatif:');
             console.log('1. Buat file "akun.txt" di folder yang sama dengan script ini');
             console.log('2. Copy-paste cookie ke dalam file tersebut');
@@ -178,7 +173,6 @@
         }
     }
 
-    // Simple input function with timeout
     async function askQuestion(question, defaultValue = '') {
         const rl = createCleanReadline();
 
@@ -186,7 +180,7 @@
             const answer = await new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Input timeout'));
-                }, 30000); // 30 seconds
+                }, 30000);
 
                 rl.question(question, (input) => {
                     clearTimeout(timeout);
@@ -201,8 +195,6 @@
             return defaultValue;
         }
     }
-
-    // ====== REST OF THE ORIGINAL CODE (unchanged) ======
 
     // DATA
     const SEEDS = {
@@ -269,6 +261,7 @@
         warn: (m) => console.log(`${ts()} ${C.yellow(icons.warn + ' ' + m)}`),
         err: (m) => console.log(`${ts()} ${C.red(icons.err + ' ' + m)}`),
         step: (m) => console.log(`${ts()} ${C.magenta(m)}`),
+        debug: (m) => console.log(`${ts()} ${C.gray('[DEBUG] ' + m)}`),
         section(title) {
             const cols = process.stdout.columns || 80;
             const line = '─'.repeat(Math.max(10, Math.min(60, cols - 10)));
@@ -305,20 +298,74 @@
         } catch { return {}; }
     }
 
-    // TRPC HTTP (unchanged from original)
+    // IMPROVED TRPC HTTP WITH BETTER ERROR HANDLING
     function parseTrpcResponseText(text) {
-        try { return JSON.parse(text); } catch { }
+        try {
+            return JSON.parse(text);
+        } catch { }
+
         const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
         if (!lines.length) throw new Error('Empty tRPC response');
-        try { return JSON.parse(lines[lines.length - 1]); } catch {
+
+        // Try parsing the last line (common for streaming responses)
+        try {
+            return JSON.parse(lines[lines.length - 1]);
+        } catch {
+            // Try parsing each line until we find valid JSON
+            for (let i = lines.length - 1; i >= 0; i--) {
+                try {
+                    return JSON.parse(lines[i]);
+                } catch { }
+            }
             throw new Error(`Invalid JSON/JSONL response: ${text.slice(0, 300)}`);
         }
     }
 
     function normalizeTrpc(json) {
-        if (Array.isArray(json)) return json[0];
-        if (json && Array.isArray(json.json)) return json.json[0];
+        // Handle array response format
+        if (Array.isArray(json) && json.length > 0) {
+            return json[0];
+        }
+        // Handle nested json array format
+        if (json && Array.isArray(json.json) && json.json.length > 0) {
+            return json.json[0];
+        }
         return json;
+    }
+
+    // Enhanced fetch with retry mechanism
+    async function fetchWithRetry(url, options, retries = MAX_RETRIES) {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                // Add timeout to prevent hanging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response;
+            } catch (error) {
+                log.debug(`Fetch attempt ${attempt}/${retries} failed: ${error.message}`);
+
+                if (attempt === retries) {
+                    throw error;
+                }
+
+                // Exponential backoff
+                const delay = RETRY_DELAY * Math.pow(2, attempt - 1);
+                log.warn(`Retrying in ${delay}ms...`);
+                await sleep(delay);
+            }
+        }
     }
 
     async function trpcPost(path, payload) {
@@ -326,91 +373,149 @@
         let sigPayload = null;
         if (payload && payload[0] && payload[0].json) sigPayload = payload[0].json;
 
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'accept': 'application/json',
-                'content-type': 'application/json',
-                'cookie': COOKIE,
-                'origin': 'https://app.appleville.xyz',
-                'referer': 'https://app.appleville.xyz/',
-                'user-agent': 'Mozilla/5.0',
-                'trpc-accept': 'application/json',
-                'x-trpc-source': 'nextjs-react',
-                ...(await mutationHeaders(sigPayload)),
-            },
-            body: JSON.stringify(payload),
-        });
-        const text = await res.text();
-        const parsed = parseTrpcResponseText(text);
-        return normalizeTrpc(parsed);
+        log.debug(`POST ${path} with payload: ${JSON.stringify(payload)}`);
+
+        try {
+            const res = await fetchWithRetry(url, {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json',
+                    'cookie': COOKIE,
+                    'origin': 'https://app.appleville.xyz',
+                    'referer': 'https://app.appleville.xyz/',
+                    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'trpc-accept': 'application/json',
+                    'x-trpc-source': 'nextjs-react',
+                    ...(await mutationHeaders(sigPayload)),
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const text = await res.text();
+            log.debug(`Response: ${text}`);
+
+            const parsed = parseTrpcResponseText(text);
+            return normalizeTrpc(parsed);
+        } catch (error) {
+            log.err(`trpcPost failed for ${path}: ${error.message}`);
+            throw error;
+        }
     }
 
     async function trpcGet(path) {
         const url = `${BASE}/${path}?batch=1`;
-        const res = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'accept': 'application/json',
-                'cookie': COOKIE,
-                'origin': 'https://app.appleville.xyz',
-                'referer': 'https://app.appleville.xyz/',
-                'user-agent': 'Mozilla/5.0',
-                'trpc-accept': 'application/json',
-                'x-trpc-source': 'nextjs-react',
-            },
-        });
-        const text = await res.text();
-        const parsed = parseTrpcResponseText(text);
-        if (Array.isArray(parsed)) return parsed;
-        if (parsed && Array.isArray(parsed.json)) return parsed.json;
-        return parsed;
+
+        try {
+            const res = await fetchWithRetry(url, {
+                method: 'GET',
+                headers: {
+                    'accept': 'application/json',
+                    'cookie': COOKIE,
+                    'origin': 'https://app.appleville.xyz',
+                    'referer': 'https://app.appleville.xyz/',
+                    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'trpc-accept': 'application/json',
+                    'x-trpc-source': 'nextjs-react',
+                },
+            });
+
+            const text = await res.text();
+            const parsed = parseTrpcResponseText(text);
+
+            if (Array.isArray(parsed)) return parsed;
+            if (parsed && Array.isArray(parsed.json)) return parsed.json;
+            return parsed;
+        } catch (error) {
+            log.err(`trpcGet failed for ${path}: ${error.message}`);
+            throw error;
+        }
     }
 
     const isErrorItem = (item) => !!(item?.error || item?.error?.json);
     const getError = (item) => {
         const ej = item?.error?.json || item?.error || item;
-        return { message: ej?.message || 'Unknown error', code: ej?.data?.code || ej?.code, path: ej?.data?.path || 'unknown', httpStatus: ej?.data?.httpStatus };
+        return {
+            message: ej?.message || 'Unknown error',
+            code: ej?.data?.code || ej?.code,
+            path: ej?.data?.path || 'unknown',
+            httpStatus: ej?.data?.httpStatus
+        };
     };
 
-    // STATE & ACTIONS (unchanged)
+    // STATE & ACTIONS
     async function getState() {
-        const data = await trpcGet('auth.me,core.getState');
-        if (Array.isArray(data) && data.length >= 2) {
-            return { ok: true, user: data[0]?.result?.data?.json, state: data[1]?.result?.data?.json };
+        try {
+            const data = await trpcGet('auth.me,core.getState');
+            if (Array.isArray(data) && data.length >= 2) {
+                return { ok: true, user: data[0]?.result?.data?.json, state: data[1]?.result?.data?.json };
+            }
+            return { ok: false, err: { message: 'Failed to parse state' } };
+        } catch (error) {
+            return { ok: false, err: { message: error.message } };
         }
-        return { ok: false, err: { message: 'Failed to parse state' } };
     }
 
     async function plantMultiple(plantings) {
         if (!plantings.length) return { ok: true, data: { plantedSeeds: 0 } };
-        const item = await trpcPost('core.plantSeed', { 0: { json: { plantings } } });
-        if (isErrorItem(item)) return { ok: false, err: getError(item) };
-        return { ok: true, data: item?.result?.data?.json };
+        try {
+            const item = await trpcPost('core.plantSeed', { 0: { json: { plantings } } });
+            if (isErrorItem(item)) return { ok: false, err: getError(item) };
+            return { ok: true, data: item?.result?.data?.json };
+        } catch (error) {
+            return { ok: false, err: { message: error.message } };
+        }
     }
 
     async function applyModifierMultiple(applications) {
         if (!applications.length) return { ok: true, data: { appliedModifiers: 0 } };
-        const item = await trpcPost('core.applyModifier', { 0: { json: { applications } } });
-        if (isErrorItem(item)) return { ok: false, err: getError(item) };
-        return { ok: true, data: item?.result?.data?.json };
+        try {
+            const item = await trpcPost('core.applyModifier', { 0: { json: { applications } } });
+            if (isErrorItem(item)) return { ok: false, err: getError(item) };
+            return { ok: true, data: item?.result?.data?.json };
+        } catch (error) {
+            return { ok: false, err: { message: error.message } };
+        }
     }
 
     async function harvestMultiple(slotIndexes) {
         if (!slotIndexes.length) return { ok: true, data: { plotResults: [] } };
-        const item = await trpcPost('core.harvest', { 0: { json: { slotIndexes } } });
-        if (isErrorItem(item)) return { ok: false, err: getError(item) };
-        return { ok: true, data: item?.result?.data?.json };
+        try {
+            const item = await trpcPost('core.harvest', { 0: { json: { slotIndexes } } });
+            if (isErrorItem(item)) return { ok: false, err: getError(item) };
+            return { ok: true, data: item?.result?.data?.json };
+        } catch (error) {
+            return { ok: false, err: { message: error.message } };
+        }
     }
 
+    // IMPROVED BUY FUNCTION WITH BETTER ERROR HANDLING
     async function buy(key, quantity, type) {
         if (quantity <= 0) return { ok: true, data: { purchasedItems: 0 } };
-        const item = await trpcPost('core.buyItem', { 0: { json: { purchases: [{ key, quantity, type }] } } });
-        if (isErrorItem(item)) return { ok: false, err: getError(item) };
-        return { ok: true, data: item?.result?.data?.json };
+
+        const purchases = [{ key, quantity, type }];
+        log.debug(`Attempting to buy: ${JSON.stringify(purchases)}`);
+
+        try {
+            const item = await trpcPost('core.buyItem', { 0: { json: { purchases } } });
+
+            if (isErrorItem(item)) {
+                const err = getError(item);
+                log.err(`Purchase failed: ${err.message} (code: ${err.code})`);
+                return { ok: false, err };
+            }
+
+            const result = item?.result?.data?.json;
+            log.debug(`Purchase result: ${JSON.stringify(result)}`);
+
+            return { ok: true, data: result };
+        } catch (error) {
+            log.err(`Purchase exception: ${error.message}`);
+            return { ok: false, err: { message: error.message } };
+        }
     }
 
-    // HELPERS (unchanged from original - too long to include here)
+    // HELPER FUNCTIONS
     function slotMapFromState(state) {
         const plots = state?.plots || [];
         const map = new Map();
@@ -644,7 +749,7 @@
         }
     })();
 
-    // ====== HELPER FUNCTIONS (continued from main code) ======
+    // ====== HELPER FUNCTIONS ======
 
     async function ensureBoosterForSlots(st, slots, boosterKey, boosterBuyQty) {
         if (!boosterKey || boosterKey === 'none' || !slots.length) return { applied: 0 };
@@ -678,23 +783,36 @@
             const b = await buy(boosterKey, buyQty, MODIFIER_TYPE);
             if (!b.ok) {
                 log.err(`Buy booster failed: ${b.err?.message || 'unknown'}`);
+                // Continue with available boosters instead of failing completely
+                if (have === 0) {
+                    log.warn('No boosters available, skipping booster application');
+                    return { applied: 0 };
+                }
             } else {
                 log.ok(`${icons.buy} Booster purchased successfully`);
             }
             await sleep(PAUSE_MS);
         }
 
-        // Apply boosters
-        const r = await applyModifierMultiple(toApply);
+        // Apply boosters (only apply as many as we have in inventory)
+        const finalHave = inventoryCount(st.state, boosterKey, MODIFIER_TYPE) + (missing > 0 ? Math.max(boosterBuyQty, missing) : 0);
+        const actualToApply = toApply.slice(0, Math.min(toApply.length, finalHave));
+
+        if (actualToApply.length === 0) {
+            log.warn('No boosters to apply after inventory check');
+            return { applied: 0 };
+        }
+
+        const r = await applyModifierMultiple(actualToApply);
         if (!r.ok) {
             log.err(`${icons.boost} Apply booster failed: ${r.err?.message || 'unknown'}`);
         } else {
-            log.ok(`${icons.boost} Booster applied to ${r.data?.appliedModifiers ?? toApply.length} slots`);
+            log.ok(`${icons.boost} Booster applied to ${r.data?.appliedModifiers ?? actualToApply.length} slots`);
         }
 
         await sleep(PAUSE_MS);
         const refreshed = await refreshSlots(slots);
-        return { applied: r.ok ? (r.data?.appliedModifiers ?? toApply.length) : 0, refreshed };
+        return { applied: r.ok ? (r.data?.appliedModifiers ?? actualToApply.length) : 0, refreshed };
     }
 
     async function ensurePlantForEmpty(st, slots, seedKey, seedBuyQty, boosterKey, boosterBuyQty) {
@@ -714,51 +832,78 @@
             const b = await buy(seedKey, buyQty, ITEM_TYPE);
             if (!b.ok) {
                 log.err(`Buy seeds failed: ${b.err?.message || 'unknown'}`);
+
+                // Check if we have enough seeds to plant at least some slots
+                if (haveSeeds === 0) {
+                    log.err('No seeds available and purchase failed, cannot plant');
+                    return { planted: 0 };
+                }
+                log.warn(`Continuing with available seeds: ${haveSeeds}`);
             } else {
                 log.ok(`${icons.buy} Seeds purchased successfully`);
             }
             await sleep(PAUSE_MS);
         }
 
-        // Plant seeds
-        const p = await plantMultiple(empty.map(slotIndex => ({ slotIndex, seedKey })));
+        // Plant seeds (only plant as many as we have seeds for)
+        const finalHaveSeeds = inventoryCount(st.state, seedKey, ITEM_TYPE) + (missing > 0 ? Math.max(seedBuyQty, missing) : 0);
+        const actualToPlant = empty.slice(0, Math.min(empty.length, finalHaveSeeds));
+
+        if (actualToPlant.length === 0) {
+            log.warn('No seeds to plant after inventory check');
+            return { planted: 0 };
+        }
+
+        const plantings = actualToPlant.map(slotIndex => ({ slotIndex, seedKey }));
+        const p = await plantMultiple(plantings);
         if (!p.ok) {
             log.err(`${icons.plant} Planting failed: ${p.err?.message || 'unknown'}`);
         } else {
-            log.ok(`${icons.plant} Planted ${p.data?.plantedSeeds ?? empty.length} slot(s)`);
+            log.ok(`${icons.plant} Planted ${p.data?.plantedSeeds ?? actualToPlant.length} slot(s)`);
         }
         await sleep(PAUSE_MS);
 
         // Apply booster to new plants
         let refreshedAfterBooster = null;
-        if (boosterKey && boosterKey !== 'none') {
+        if (boosterKey && boosterKey !== 'none' && p.ok) {
             const haveB = inventoryCount(st.state, boosterKey, MODIFIER_TYPE);
-            const missB = Math.max(0, empty.length - haveB);
+            const missB = Math.max(0, actualToPlant.length - haveB);
 
             if (missB > 0) {
                 const buyQty = Math.max(boosterBuyQty, missB);
-                log.warn(`${icons.buy} Need boosters for new plants: have=${haveB}, need=${empty.length} → buying ${buyQty} ${boosterKey}`);
+                log.warn(`${icons.buy} Need boosters for new plants: have=${haveB}, need=${actualToPlant.length} → buying ${buyQty} ${boosterKey}`);
 
                 const bb = await buy(boosterKey, buyQty, MODIFIER_TYPE);
                 if (!bb.ok) {
                     log.err(`Buy booster failed: ${bb.err?.message || 'unknown'}`);
+                    if (haveB === 0) {
+                        log.warn('No boosters available for new plants');
+                        return { planted: p.ok ? (p.data?.plantedSeeds ?? actualToPlant.length) : 0, refreshedAfterBooster: null };
+                    }
                 } else {
                     log.ok(`${icons.buy} Booster purchased for new plants`);
                 }
                 await sleep(PAUSE_MS);
             }
 
-            const a = await applyModifierMultiple(empty.map(slotIndex => ({ slotIndex, modifierKey: boosterKey })));
-            if (!a.ok) {
-                log.err(`${icons.boost} Apply booster (new plants) failed: ${a.err?.message || 'unknown'}`);
-            } else {
-                log.ok(`${icons.boost} Booster applied to ${a.data?.appliedModifiers ?? empty.length} new plants`);
+            const finalHaveB = inventoryCount(st.state, boosterKey, MODIFIER_TYPE) + (missB > 0 ? Math.max(boosterBuyQty, missB) : 0);
+            const actualBoosterApply = actualToPlant.slice(0, Math.min(actualToPlant.length, finalHaveB));
+
+            if (actualBoosterApply.length > 0) {
+                const applications = actualBoosterApply.map(slotIndex => ({ slotIndex, modifierKey: boosterKey }));
+                const a = await applyModifierMultiple(applications);
+                if (!a.ok) {
+                    log.err(`${icons.boost} Apply booster (new plants) failed: ${a.err?.message || 'unknown'}`);
+                } else {
+                    log.ok(`${icons.boost} Booster applied to ${a.data?.appliedModifiers ?? actualBoosterApply.length} new plants`);
+                }
+                await sleep(PAUSE_MS);
             }
-            await sleep(PAUSE_MS);
-            refreshedAfterBooster = await refreshSlots(empty);
+
+            refreshedAfterBooster = await refreshSlots(actualToPlant);
         }
 
-        return { planted: p.ok ? (p.data?.plantedSeeds ?? empty.length) : 0, refreshedAfterBooster };
+        return { planted: p.ok ? (p.data?.plantedSeeds ?? actualToPlant.length) : 0, refreshedAfterBooster };
     }
 
     function calculateEstimatedEnd(seedKey, boosterKey) {
