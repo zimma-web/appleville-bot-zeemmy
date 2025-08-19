@@ -26,10 +26,11 @@ Bot Node.js untuk otomatis **cek/plant/booster/harvest** dan menampilkan countdo
 ## 📦 Instalasi
 
 ```bash
-# (opsional) buat folder
-git clone https://github.com/caraka15/appleville-bot && cd appleville-bot
+# (opsional) clone code
+git clone https://github.com/caraka15/appleville-bot
 
-# simpan file: apple.js (kode bot) di folder ini
+# buka folder
+cd appleville-bot
 
 # install dependencies tampilan terminal
 npm i log-update cli-table3 picocolors fs path
