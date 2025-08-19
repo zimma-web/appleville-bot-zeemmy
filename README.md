@@ -42,6 +42,11 @@ npm i log-update cli-table3 picocolors fs path
 
 ## 🔑 Setup Cookie (`akun.txt`)
 
+--**Cara mengambil cookies***: buka inspect atau ctrl+f12, buka network, cari api bernama auth.me pada header ada cookies, copy semua
+<img width="644" height="469" alt="image" src="https://github.com/user-attachments/assets/2f566489-44c2-4004-bc3e-95574421387c" />
+
+
+
 - **Otomatis (disarankan)**: saat pertama kali menjalankan, jika `akun.txt` belum ada/kosong, bot akan **meminta cookie** di terminal dan **menyimpannya** ke `akun.txt`.
 
 **Keamanan:** `akun.txt` berisi kredensial. **JANGAN commit** file ini. Lihat `.gitignore` di bawah.
