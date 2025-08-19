@@ -43,16 +43,6 @@ npm i log-update cli-table3 picocolors fs path
 ## 🔑 Setup Cookie (`akun.txt`)
 
 - **Otomatis (disarankan)**: saat pertama kali menjalankan, jika `akun.txt` belum ada/kosong, bot akan **meminta cookie** di terminal dan **menyimpannya** ke `akun.txt`.
-- **Manual**:
-
-  1. Buat file `akun.txt` di folder yang sama dengan `apple.js`.
-  2. Isi **satu baris** cookie lengkap Anda, lalu simpan.
-
-> Contoh isi `akun.txt` (hanya contoh, bukan valid):
->
-> ```
-> __Host-authjs.csrf-token=...; __Secure-authjs.callback-url=...; session-token=...
-> ```
 
 **Keamanan:** `akun.txt` berisi kredensial. **JANGAN commit** file ini. Lihat `.gitignore` di bawah.
 
