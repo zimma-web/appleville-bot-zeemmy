@@ -64,9 +64,6 @@
     const DEFAULT_BOOSTER_QTY = 12;
     const AUTO_REFRESH_BOOSTER = true;
     const BASE = 'https://app.appleville.xyz/api/trpc';
-    // NOTE: ITEM_TYPE and MODIFIER_TYPE are kept for conceptual clarity, but not used in inventoryCount anymore.
-    const ITEM_TYPE = 'SEED';
-    const MODIFIER_TYPE = 'MODIFIER';
     const PAUSE_MS = 150;
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 2000;
@@ -490,27 +487,19 @@
         }
     }
 
-    // [FIXED] BUY FUNCTION WITH CORRECT PAYLOAD STRUCTURE
     async function buy(key, quantity) {
         if (quantity <= 0) return { ok: true, data: { purchasedItems: 0 } };
-
-        // [FIX #1] Create a single purchase object with the total quantity.
         const purchases = [{ key, quantity }];
-
         log.debug(`Attempting to buy: ${JSON.stringify(purchases)}`);
-
         try {
             const item = await trpcPost('core.buyItem', { 0: { json: { purchases } } });
-
             if (isErrorItem(item)) {
                 const err = getError(item);
                 log.err(`Purchase failed: ${err.message} (code: ${err.code})`);
                 return { ok: false, err };
             }
-
             const result = item?.result?.data?.json;
             log.debug(`Purchase result: ${JSON.stringify(result)}`);
-
             return { ok: true, data: result };
         } catch (error) {
             log.err(`Purchase exception: ${error.message}`);
@@ -535,10 +524,7 @@
         return map;
     }
 
-    // [FIXED] INVENTORY COUNT FUNCTION
     function inventoryCount(state, key) {
-        // [FIX #2] The API response for items does not contain a 'type' field.
-        // We find the item by its 'key' only.
         const hit = (state?.items || []).find(x => x.key === key);
         return hit?.quantity || 0;
     }
@@ -553,13 +539,11 @@
 
     (async function main() {
         try {
-            // Setup cookie with improved input handling
             await ensureCookieInteractive();
 
             const seedList = Object.keys(SEEDS).join(', ');
             const boosterList = 'none, ' + Object.keys(BOOSTERS).join(', ');
 
-            // Get user preferences with better input handling
             console.log('🍎 === Setup Bot Configuration ===\n');
 
             const slotsAns = await askQuestion(`Masukkan slot (mis: 1,2,3) [default ${DEFAULT_SLOTS.join(',')}]: `);
@@ -609,43 +593,39 @@
             log.info(`${C.bold('Booster')}=${boosterKey}${boosterKey !== 'none' ? ` (${BOOSTERS[boosterKey].effect})` : ''}`);
             log.sectionEnd();
 
-            // INIT STATE - Test cookie first
             console.log('\n🔄 Testing connection...');
-            let st = await getState();
-            if (!st.ok) {
-                log.err(`❌ getState gagal: ${st.err?.message || 'unknown'}`);
-                console.log('\n💡 Kemungkinan masalah:');
-                console.log('   - Cookie sudah expired');
-                console.log('   - Format cookie salah');
-                console.log('   - Koneksi internet bermasalah');
-                console.log('\n🔧 Solusi:');
-                console.log('   - Hapus file akun.txt dan jalankan ulang script');
-                console.log('   - Pastikan login di browser masih aktif');
+            let st_res = await getState();
+            if (!st_res.ok) {
+                log.err(`❌ getState gagal: ${st_res.err?.message || 'unknown'}`);
+                console.log('\n💡 Kemungkinan masalah:\n   - Cookie sudah expired\n   - Format cookie salah\n   - Koneksi internet bermasalah');
+                console.log('\n🔧 Solusi:\n   - Hapus file akun.txt dan jalankan ulang script\n   - Pastikan login di browser masih aktif');
                 process.exit(1);
             }
 
-            console.log(`✅ Connected! User: ${st.user?.name || 'Unknown'}`);
-            console.log(`💰 Balance: ${st.state?.coins || 0} coins, ${st.state?.apples || 0} apples`);
+            console.log(`✅ Connected! User: ${st_res.user?.name || 'Unknown'}`);
+            console.log(`💰 Balance: ${st_res.state?.coins || 0} coins, ${st_res.state?.apples || 0} apples`);
 
-            // Apply booster to already planted slots
-            const mapInit = slotMapFromState(st.state);
-            const plantedInit = slots.filter(s => !!mapInit.get(s)?.seedKey);
-            if (plantedInit.length && boosterKey !== 'none') {
-                log.step(`${icons.boost} Checking/applying booster for planted slots: ${plantedInit.join(', ')}`);
-                const { refreshed } = await ensureBoosterForSlots(st, plantedInit, boosterKey, boosterBuyQty);
-                if (refreshed) st = await getState();
+            // Initial check for boosters on already planted slots
+            const initialMap = slotMapFromState(st_res.state);
+            const initiallyPlanted = slots.filter(s => !!initialMap.get(s)?.seedKey);
+            if (initiallyPlanted.length > 0 && boosterKey !== 'none') {
+                log.step(`${icons.boost} Initial check for boosters on planted slots: ${initiallyPlanted.join(', ')}`);
+                await ensureBoosterForSlots(st_res.state, initiallyPlanted, boosterKey, boosterBuyQty);
             }
 
-            // Plant empty slots
-            const plantRes = await ensurePlantForEmpty(st, slots, seedKey, seedBuyQty, boosterKey, boosterBuyQty);
-            if (plantRes.refreshedAfterBooster) st = await getState();
+            // Initial planting for empty slots
+            await ensurePlantForEmpty(st_res.state, slots, seedKey, seedBuyQty);
+
+            // Get the final state after all initial actions
+            st_res = await getState();
+            let currentState = st_res.state;
 
             // Build pending times
-            const latest = slotMapFromState(st.state);
+            const latestMap = slotMapFromState(currentState);
             const pendingSeed = new Map();
             const pendingBoost = new Map();
             for (const s of slots) {
-                const r = latest.get(s);
+                const r = latestMap.get(s);
                 if (r?.seedKey && r?.seedEndsAt) {
                     pendingSeed.set(s, r.seedEndsAt);
                     pendingBoost.set(s, r.boosterEndsAt || null);
@@ -661,11 +641,9 @@
 
             // MAIN FARMING LOOP
             while (isRunning) {
-                // Display current status
                 if (useLogUpdate) {
                     logUpdate(renderTicker(pendingSeed, pendingBoost));
                 } else {
-                    // Non-TTY fallback
                     if (!global.__lastFallback || Date.now() - global.__lastFallback > 60000) {
                         console.log(renderTicker(pendingSeed, pendingBoost));
                         global.__lastFallback = Date.now();
@@ -673,17 +651,15 @@
                 }
 
                 const tNow = nowMs();
-                const ready = [];
+                const readyToHarvest = [];
                 for (const [s, t] of pendingSeed.entries()) {
-                    if (t <= tNow) ready.push(s);
+                    if (t <= tNow) readyToHarvest.push(s);
                 }
 
-                // Harvest ready slots
-                if (ready.length) {
-                    if (useLogUpdate && logUpdate.clear) logUpdate.clear();
-
-                    log.step(`${icons.harvest} Harvesting slots: ${ready.join(', ')}`);
-                    const hv = await harvestMultiple(ready);
+                if (readyToHarvest.length > 0) {
+                    if (useLogUpdate) logUpdate.clear();
+                    log.step(`${icons.harvest} Harvesting slots: ${readyToHarvest.join(', ')}`);
+                    const hv = await harvestMultiple(readyToHarvest);
 
                     if (!hv.ok) {
                         log.err(`Harvest failed: ${hv.err?.message || 'unknown'}`);
@@ -694,50 +670,44 @@
                         const xp = pr.reduce((a, x) => a + (x.xpGained || 0), 0);
                         log.ok(`Earned: +${coins} coins${apples ? `, +${apples} apples` : ''}, +${xp} XP`);
                     }
-
                     await sleep(PAUSE_MS);
 
-                    // Get fresh state and replant
-                    let st2 = await getState();
-                    if (!st2.ok) st2 = st;
+                    let stateAfterHarvest = await getState();
+                    if (stateAfterHarvest.ok) {
+                        await ensurePlantForEmpty(stateAfterHarvest.state, readyToHarvest, seedKey, seedBuyQty);
+                    }
 
-                    await ensurePlantForEmpty(st2, ready, seedKey, seedBuyQty, boosterKey, boosterBuyQty);
-                    await sleep(PAUSE_MS);
-
-                    // Update pending times for replanted slots
-                    const refreshed = await refreshEndsForSlots(ready);
+                    const refreshed = await refreshEndsForSlots(readyToHarvest);
                     for (const [s, obj] of refreshed.entries()) {
                         pendingSeed.set(s, obj.seedEndsAt);
                         pendingBoost.set(s, obj.boosterEndsAt || null);
                     }
                 }
 
-                // Auto-refresh expired boosters
                 if (boosterKey !== 'none' && AUTO_REFRESH_BOOSTER) {
-                    const needBooster = [];
-                    for (const [s, tPlant] of pendingSeed.entries()) {
-                        const bEnd = pendingBoost.get(s) || 0;
-                        if (tPlant > tNow && (!bEnd || bEnd <= tNow)) {
-                            needBooster.push(s);
+                    const needsBooster = [];
+                    const currentMap = slotMapFromState((await getState()).state);
+                    for (const s of slots) {
+                        const slotInfo = currentMap.get(s);
+                        // Check if slot is planted but has an expired or no modifier
+                        if (slotInfo?.seedKey && (!slotInfo.modifierKey || (slotInfo.boosterEndsAt && slotInfo.boosterEndsAt <= tNow))) {
+                            needsBooster.push(s);
                         }
                     }
 
-                    if (needBooster.length) {
-                        if (useLogUpdate && logUpdate.clear) logUpdate.clear();
-
-                        log.step(`${icons.boost} Booster expired → re-applying: ${needBooster.join(', ')}`);
-                        const st3 = await getState();
-                        if (st3.ok) {
-                            await ensureBoosterForSlots(st3, needBooster, boosterKey, boosterBuyQty);
-                            await sleep(PAUSE_MS);
-
-                            // Update booster end times
-                            const ref2 = await refreshEndsForSlots(needBooster);
+                    if (needsBooster.length > 0) {
+                        if (useLogUpdate) logUpdate.clear();
+                        log.step(`${icons.boost} Expired/missing booster detected, applying to: ${needsBooster.join(', ')}`);
+                        let stateForBooster = await getState();
+                        if (stateForBooster.ok) {
+                            await ensureBoosterForSlots(stateForBooster.state, needsBooster, boosterKey, boosterBuyQty);
+                            const ref2 = await refreshEndsForSlots(needsBooster);
                             for (const [s, obj] of ref2.entries()) {
-                                pendingSeed.set(s, obj.seedEndsAt);
-                                pendingBoost.set(s, obj.boosterEndsAt || null);
+                                if (pendingSeed.has(s)) { // Only update if it's a slot we are tracking
+                                    pendingBoost.set(s, obj.boosterEndsAt || null);
+                                }
                             }
-                            log.ok(`Booster end times updated`);
+                            log.ok(`Booster status updated.`);
                         }
                     }
                 }
@@ -745,7 +715,7 @@
                 await sleep(1000);
             }
 
-            if (useLogUpdate && logUpdate.clear) logUpdate.clear();
+            if (useLogUpdate) logUpdate.clear();
             log.info('✅ Bot stopped gracefully.');
 
         } catch (error) {
@@ -757,29 +727,30 @@
 
     // ====== HELPER FUNCTIONS ======
 
-    async function ensureBoosterForSlots(st, slots, boosterKey, boosterBuyQty) {
-        if (!boosterKey || boosterKey === 'none' || !slots.length) return { applied: 0 };
+    // [REVISED] Checks for ANY active modifier before attempting to apply a new one.
+    async function ensureBoosterForSlots(currentState, slots, boosterKey, boosterBuyQty) {
+        if (!boosterKey || boosterKey === 'none' || !slots.length) return;
 
-        const map = slotMapFromState(st.state);
+        const map = slotMapFromState(currentState);
         const toApply = [];
 
         for (const s of slots) {
             const info = map.get(s);
             if (!info?.seedKey) continue;
 
-            const active = info.modifierKey === boosterKey &&
-                info.boosterEndsAt &&
-                info.boosterEndsAt > nowMs();
+            const isAnyModifierActive = info.modifierKey && info.boosterEndsAt && info.boosterEndsAt > nowMs();
 
-            if (!active) {
+            if (!isAnyModifierActive) {
                 toApply.push({ slotIndex: s, modifierKey: boosterKey });
             }
         }
 
-        if (!toApply.length) return { applied: 0 };
+        if (!toApply.length) {
+            log.info('All checked slots already have an active booster.');
+            return;
+        }
 
-        // Check inventory and buy if needed
-        let have = inventoryCount(st.state, boosterKey);
+        let have = inventoryCount(currentState, boosterKey);
         const missing = Math.max(0, toApply.length - have);
 
         if (missing > 0) {
@@ -790,26 +761,25 @@
             if (!b.ok) {
                 log.err(`Buy booster failed: ${b.err?.message || 'unknown'}`);
                 if (have === 0) {
-                    log.warn('No boosters available, skipping booster application');
-                    return { applied: 0 };
+                    log.warn('No boosters available, skipping application.');
+                    return;
                 }
             } else {
                 log.ok(`${icons.buy} Booster purchased successfully`);
-                // Refresh state to get updated inventory
-                const newState = await getState();
-                if (newState.ok) {
-                    have = inventoryCount(newState.state, boosterKey);
+                const newStateResult = await getState();
+                if (newStateResult.ok) {
+                    currentState = newStateResult.state;
+                    have = inventoryCount(currentState, boosterKey);
                 }
             }
             await sleep(PAUSE_MS);
         }
 
-        // Apply boosters (only apply as many as we have in inventory)
         const actualToApply = toApply.slice(0, Math.min(toApply.length, have));
 
         if (actualToApply.length === 0) {
-            log.warn('No boosters to apply after inventory check');
-            return { applied: 0 };
+            log.warn('Not enough boosters to apply after inventory check.');
+            return;
         }
 
         const r = await applyModifierMultiple(actualToApply);
@@ -818,22 +788,17 @@
         } else {
             log.ok(`${icons.boost} Booster applied to ${r.data?.appliedModifiers ?? actualToApply.length} slots`);
         }
-
-        await sleep(PAUSE_MS);
-        const refreshed = await refreshSlots(slots);
-        return { applied: r.ok ? (r.data?.appliedModifiers ?? actualToApply.length) : 0, refreshed };
     }
 
-    async function ensurePlantForEmpty(st, slots, seedKey, seedBuyQty, boosterKey, boosterBuyQty) {
-        const map = slotMapFromState(st.state);
+    // [REVISED] This function ONLY handles planting. Booster application is now handled by the main loop.
+    async function ensurePlantForEmpty(currentState, slots, seedKey, seedBuyQty) {
+        const map = slotMapFromState(currentState);
         const empty = slots.filter(s => !map.get(s)?.seedKey);
 
-        if (!empty.length) return { planted: 0 };
+        if (!empty.length) return;
 
-        // Check seed inventory and buy if needed
-        let haveSeeds = inventoryCount(st.state, seedKey);
+        let haveSeeds = inventoryCount(currentState, seedKey);
         const missing = Math.max(0, empty.length - haveSeeds);
-        let stateAfterBuy = st.state;
 
         if (missing > 0) {
             const buyQty = Math.max(seedBuyQty, missing);
@@ -843,28 +808,25 @@
             if (!b.ok) {
                 log.err(`Buy seeds failed: ${b.err?.message || 'unknown'}`);
                 if (haveSeeds === 0) {
-                    log.err('No seeds available and purchase failed, cannot plant');
-                    return { planted: 0 };
+                    log.err('No seeds available and purchase failed, cannot plant.');
+                    return;
                 }
                 log.warn(`Continuing with available seeds: ${haveSeeds}`);
             } else {
                 log.ok(`${icons.buy} Seeds purchased successfully`);
-                // Refresh state to get updated inventory
-                const newState = await getState();
-                if (newState.ok) {
-                    stateAfterBuy = newState.state;
-                    haveSeeds = inventoryCount(stateAfterBuy, seedKey);
+                const newStateResult = await getState();
+                if (newStateResult.ok) {
+                    haveSeeds = inventoryCount(newStateResult.state, seedKey);
                 }
             }
             await sleep(PAUSE_MS);
         }
 
-        // Plant seeds (only plant as many as we have seeds for)
         const actualToPlant = empty.slice(0, Math.min(empty.length, haveSeeds));
 
         if (actualToPlant.length === 0) {
-            log.warn('No seeds to plant after inventory check');
-            return { planted: 0 };
+            log.warn('No seeds to plant after inventory check.');
+            return;
         }
 
         const plantings = actualToPlant.map(slotIndex => ({ slotIndex, seedKey }));
@@ -874,68 +836,6 @@
         } else {
             log.ok(`${icons.plant} Planted ${p.data?.plantedSeeds ?? actualToPlant.length} slot(s)`);
         }
-        await sleep(PAUSE_MS);
-
-        // Apply booster to new plants
-        let refreshedAfterBooster = null;
-        if (boosterKey && boosterKey !== 'none' && p.ok) {
-            let haveB = inventoryCount(stateAfterBuy, boosterKey);
-            const missB = Math.max(0, actualToPlant.length - haveB);
-
-            if (missB > 0) {
-                const buyQty = Math.max(boosterBuyQty, missB);
-                log.warn(`${icons.buy} Need boosters for new plants: have=${haveB}, need=${actualToPlant.length} → buying ${buyQty} ${boosterKey}`);
-
-                const bb = await buy(boosterKey, buyQty);
-                if (!bb.ok) {
-                    log.err(`Buy booster failed: ${bb.err?.message || 'unknown'}`);
-                    if (haveB === 0) {
-                        log.warn('No boosters available for new plants');
-                        return { planted: p.ok ? (p.data?.plantedSeeds ?? actualToPlant.length) : 0, refreshedAfterBooster: null };
-                    }
-                } else {
-                    log.ok(`${icons.buy} Booster purchased for new plants`);
-                    const newState = await getState();
-                    if (newState.ok) {
-                        haveB = inventoryCount(newState.state, boosterKey);
-                    }
-                }
-                await sleep(PAUSE_MS);
-            }
-
-            const actualBoosterApply = actualToPlant.slice(0, Math.min(actualToPlant.length, haveB));
-
-            if (actualBoosterApply.length > 0) {
-                const applications = actualBoosterApply.map(slotIndex => ({ slotIndex, modifierKey: boosterKey }));
-                const a = await applyModifierMultiple(applications);
-                if (!a.ok) {
-                    log.err(`${icons.boost} Apply booster (new plants) failed: ${a.err?.message || 'unknown'}`);
-                } else {
-                    log.ok(`${icons.boost} Booster applied to ${a.data?.appliedModifiers ?? actualBoosterApply.length} new plants`);
-                }
-                await sleep(PAUSE_MS);
-            }
-
-            refreshedAfterBooster = await refreshSlots(actualToPlant);
-        }
-
-        return { planted: p.ok ? (p.data?.plantedSeeds ?? actualToPlant.length) : 0, refreshedAfterBooster };
-    }
-
-    function calculateEstimatedEnd(seedKey, boosterKey) {
-        const meta = SEEDS[seedKey];
-        if (!meta) return null;
-
-        let base = meta.growSeconds;
-        if (boosterKey && boosterKey !== 'none') {
-            switch (boosterKey) {
-                case 'fertiliser': base = Math.round(base / 1.43); break;
-                case 'super-fertiliser': base = Math.round(base / 2); break;
-                case 'deadly-mix': base = Math.round(base / 8); break;
-                case 'quantum-fertilizer': base = Math.round(base / 2.5); break;
-            }
-        }
-        return nowMs() + base * 1000;
     }
 
     async function refreshSlots(slots) {
@@ -962,11 +862,10 @@
         const refreshed = await refreshSlots(slots);
         if (refreshed) return refreshed;
 
-        // Fallback estimation
         const out = new Map();
         for (const s of slots) {
             out.set(s, {
-                seedEndsAt: calculateEstimatedEnd(DEFAULT_SEED, DEFAULT_BOOSTER),
+                seedEndsAt: Date.now() + 5000, // Fallback
                 boosterEndsAt: null
             });
         }
@@ -975,18 +874,16 @@
 
     // TABLE TICKER DISPLAY
     function renderTicker(pendingSeed, pendingBoost) {
-        // Sort by plant end time ascending
         const arr = [...pendingSeed.entries()].map(([s, t]) => {
             const p = Math.ceil((t - nowMs()) / 1000);
             const bEnd = pendingBoost.get(s) || null;
             const b = bEnd ? Math.ceil((bEnd - nowMs()) / 1000) : null;
-            return { s, p, b };
+            return { s, p, b, bEnd };
         }).sort((a, b) => a.p - b.p);
 
         const term = process.stdout.columns || 100;
-        const cols = Math.max(2, Math.min(6, Math.floor(term / 18))); // 2-6 columns
-        const rows = 2;
-        const capacity = cols * rows;
+        const cols = Math.max(2, Math.min(6, Math.floor(term / 18)));
+        const capacity = cols * 2;
 
         const shown = arr.slice(0, capacity);
         const hiddenCount = Math.max(0, arr.length - shown.length);
@@ -995,39 +892,34 @@
         const next = arr[0] ? `${C.green(fmtSec(arr[0].p))} ${C.gray(`(slot${String(arr[0].s).padStart(2, '0')})`)}` : 'none';
         const headerRight = `next harvest: ${next}`;
 
-        // Build table cells
-        const row1 = [], row2 = [];
-        const makeCell = (x) => {
-            const slot = `slot${String(x.s).padStart(2, '0')}`;
-            const p = C.green(`🌱${fmtSec(x.p)}`);
-            const b = x.b !== null ? `\n${C.yellow(`⚡${fmtSec(x.b)}`)}` : '';
-            return `${slot}\n${p}${b}`;
-        };
-
-        for (let i = 0; i < shown.length; i++) {
-            const cell = makeCell(shown[i]);
-            if (i < cols) row1.push(cell);
-            else row2.push(cell);
-        }
-
-        while (row1.length < cols) row1.push('');
-        while (row2.length < cols) row2.push('');
-
-        const colWidths = new Array(cols).fill(Math.max(16, Math.floor((term - (cols + 1)) / cols)));
         const table = new Table({
-            colWidths,
-            wordWrap: false,
+            colWidths: new Array(cols).fill(Math.floor((term - (cols + 1)) / cols)),
             style: { head: [], border: [], compact: true },
-            chars: (!UNICODE_ENABLED ? {
+            chars: UNICODE_ENABLED ? undefined : {
                 'top': '-', 'top-mid': '+', 'top-left': '+', 'top-right': '+',
                 'bottom': '-', 'bottom-mid': '+', 'bottom-left': '+', 'bottom-right': '+',
                 'left': '|', 'left-mid': '+', 'mid': '-', 'mid-mid': '+',
                 'right': '|', 'right-mid': '+', 'middle': '|'
-            } : undefined)
+            }
         });
 
-        table.push(row1);
-        table.push(row2);
+        const makeCell = (x) => {
+            if (!x) return '';
+            const slot = `slot${String(x.s).padStart(2, '0')}`;
+            const p = C.green(`🌱${fmtSec(x.p)}`);
+            const b = x.bEnd ? (x.b > 0 ? C.yellow(`⚡${fmtSec(x.b)}`) : C.red('⚡expired')) : C.gray('⚡none');
+            return `${slot}\n${p}\n${b}`;
+        };
+
+        const rows = [];
+        for (let i = 0; i < Math.ceil(shown.length / cols); i++) {
+            const row = [];
+            for (let j = 0; j < cols; j++) {
+                row.push(makeCell(shown[i * cols + j]));
+            }
+            rows.push(row);
+        }
+        rows.forEach(row => table.push(row));
 
         const header = `${ts()} ${headerLeft}  ${C.dim('|')}  ${headerRight}`;
         const footer = hiddenCount > 0 ? `\n  ${C.gray(`+${hiddenCount} more slots not shown`)}` : '';
