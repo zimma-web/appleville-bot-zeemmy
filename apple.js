@@ -64,6 +64,7 @@
     const DEFAULT_BOOSTER_QTY = 12;
     const AUTO_REFRESH_BOOSTER = true;
     const BASE = 'https://app.appleville.xyz/api/trpc';
+    // NOTE: ITEM_TYPE and MODIFIER_TYPE are kept for conceptual clarity, but not used in inventoryCount anymore.
     const ITEM_TYPE = 'SEED';
     const MODIFIER_TYPE = 'MODIFIER';
     const PAUSE_MS = 150;
@@ -489,11 +490,13 @@
         }
     }
 
-    // IMPROVED BUY FUNCTION WITH BETTER ERROR HANDLING
-    async function buy(key, quantity, type) {
+    // [FIXED] BUY FUNCTION WITH CORRECT PAYLOAD STRUCTURE
+    async function buy(key, quantity) {
         if (quantity <= 0) return { ok: true, data: { purchasedItems: 0 } };
 
-        const purchases = [{ key, quantity, type }];
+        // [FIX #1] Create a single purchase object with the total quantity.
+        const purchases = [{ key, quantity }];
+
         log.debug(`Attempting to buy: ${JSON.stringify(purchases)}`);
 
         try {
@@ -532,8 +535,11 @@
         return map;
     }
 
-    function inventoryCount(state, key, type) {
-        const hit = (state?.items || []).find(x => x.key === key && x.type === type);
+    // [FIXED] INVENTORY COUNT FUNCTION
+    function inventoryCount(state, key) {
+        // [FIX #2] The API response for items does not contain a 'type' field.
+        // We find the item by its 'key' only.
+        const hit = (state?.items || []).find(x => x.key === key);
         return hit?.quantity || 0;
     }
 
@@ -773,30 +779,33 @@
         if (!toApply.length) return { applied: 0 };
 
         // Check inventory and buy if needed
-        const have = inventoryCount(st.state, boosterKey, MODIFIER_TYPE);
+        let have = inventoryCount(st.state, boosterKey);
         const missing = Math.max(0, toApply.length - have);
 
         if (missing > 0) {
             const buyQty = Math.max(boosterBuyQty, missing);
             log.warn(`${icons.buy} Need more boosters: have=${have}, need=${toApply.length} → buying ${buyQty} ${boosterKey}`);
 
-            const b = await buy(boosterKey, buyQty, MODIFIER_TYPE);
+            const b = await buy(boosterKey, buyQty);
             if (!b.ok) {
                 log.err(`Buy booster failed: ${b.err?.message || 'unknown'}`);
-                // Continue with available boosters instead of failing completely
                 if (have === 0) {
                     log.warn('No boosters available, skipping booster application');
                     return { applied: 0 };
                 }
             } else {
                 log.ok(`${icons.buy} Booster purchased successfully`);
+                // Refresh state to get updated inventory
+                const newState = await getState();
+                if (newState.ok) {
+                    have = inventoryCount(newState.state, boosterKey);
+                }
             }
             await sleep(PAUSE_MS);
         }
 
         // Apply boosters (only apply as many as we have in inventory)
-        const finalHave = inventoryCount(st.state, boosterKey, MODIFIER_TYPE) + (missing > 0 ? Math.max(boosterBuyQty, missing) : 0);
-        const actualToApply = toApply.slice(0, Math.min(toApply.length, finalHave));
+        const actualToApply = toApply.slice(0, Math.min(toApply.length, have));
 
         if (actualToApply.length === 0) {
             log.warn('No boosters to apply after inventory check');
@@ -822,18 +831,17 @@
         if (!empty.length) return { planted: 0 };
 
         // Check seed inventory and buy if needed
-        const haveSeeds = inventoryCount(st.state, seedKey, ITEM_TYPE);
+        let haveSeeds = inventoryCount(st.state, seedKey);
         const missing = Math.max(0, empty.length - haveSeeds);
+        let stateAfterBuy = st.state;
 
         if (missing > 0) {
             const buyQty = Math.max(seedBuyQty, missing);
             log.warn(`${icons.buy} Need more seeds: have=${haveSeeds}, need=${empty.length} → buying ${buyQty} ${seedKey}`);
 
-            const b = await buy(seedKey, buyQty, ITEM_TYPE);
+            const b = await buy(seedKey, buyQty);
             if (!b.ok) {
                 log.err(`Buy seeds failed: ${b.err?.message || 'unknown'}`);
-
-                // Check if we have enough seeds to plant at least some slots
                 if (haveSeeds === 0) {
                     log.err('No seeds available and purchase failed, cannot plant');
                     return { planted: 0 };
@@ -841,13 +849,18 @@
                 log.warn(`Continuing with available seeds: ${haveSeeds}`);
             } else {
                 log.ok(`${icons.buy} Seeds purchased successfully`);
+                // Refresh state to get updated inventory
+                const newState = await getState();
+                if (newState.ok) {
+                    stateAfterBuy = newState.state;
+                    haveSeeds = inventoryCount(stateAfterBuy, seedKey);
+                }
             }
             await sleep(PAUSE_MS);
         }
 
         // Plant seeds (only plant as many as we have seeds for)
-        const finalHaveSeeds = inventoryCount(st.state, seedKey, ITEM_TYPE) + (missing > 0 ? Math.max(seedBuyQty, missing) : 0);
-        const actualToPlant = empty.slice(0, Math.min(empty.length, finalHaveSeeds));
+        const actualToPlant = empty.slice(0, Math.min(empty.length, haveSeeds));
 
         if (actualToPlant.length === 0) {
             log.warn('No seeds to plant after inventory check');
@@ -866,14 +879,14 @@
         // Apply booster to new plants
         let refreshedAfterBooster = null;
         if (boosterKey && boosterKey !== 'none' && p.ok) {
-            const haveB = inventoryCount(st.state, boosterKey, MODIFIER_TYPE);
+            let haveB = inventoryCount(stateAfterBuy, boosterKey);
             const missB = Math.max(0, actualToPlant.length - haveB);
 
             if (missB > 0) {
                 const buyQty = Math.max(boosterBuyQty, missB);
                 log.warn(`${icons.buy} Need boosters for new plants: have=${haveB}, need=${actualToPlant.length} → buying ${buyQty} ${boosterKey}`);
 
-                const bb = await buy(boosterKey, buyQty, MODIFIER_TYPE);
+                const bb = await buy(boosterKey, buyQty);
                 if (!bb.ok) {
                     log.err(`Buy booster failed: ${bb.err?.message || 'unknown'}`);
                     if (haveB === 0) {
@@ -882,12 +895,15 @@
                     }
                 } else {
                     log.ok(`${icons.buy} Booster purchased for new plants`);
+                    const newState = await getState();
+                    if (newState.ok) {
+                        haveB = inventoryCount(newState.state, boosterKey);
+                    }
                 }
                 await sleep(PAUSE_MS);
             }
 
-            const finalHaveB = inventoryCount(st.state, boosterKey, MODIFIER_TYPE) + (missB > 0 ? Math.max(boosterBuyQty, missB) : 0);
-            const actualBoosterApply = actualToPlant.slice(0, Math.min(actualToPlant.length, finalHaveB));
+            const actualBoosterApply = actualToPlant.slice(0, Math.min(actualToPlant.length, haveB));
 
             if (actualBoosterApply.length > 0) {
                 const applications = actualBoosterApply.map(slotIndex => ({ slotIndex, modifierKey: boosterKey }));
