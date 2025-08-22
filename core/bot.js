@@ -122,8 +122,20 @@ export class Bot {
 
         const result = await api.harvestSlot(slotIndex);
         if (result.ok) {
+            // [DIPERBAIKI] Log panen sekarang menampilkan AP jika ada.
             const earnings = result.data.plotResults[0];
-            logger.success(`Slot ${slotIndex} dipanen: +${earnings.coinsEarned} koin, +${earnings.xpGained} XP.`);
+            const coins = Math.round(earnings.coinsEarned || 0);
+            const ap = Math.round(earnings.apEarned || 0);
+            const xp = Math.round(earnings.xpGained || 0);
+
+            let logMessage = `Slot ${slotIndex} dipanen: +${coins} koin`;
+            if (ap > 0) {
+                logMessage += `, +${ap} AP`;
+            }
+            logMessage += `, +${xp} XP.`;
+
+            logger.success(logMessage);
+
             await sleep(500);
             await this.handlePlanting(slotIndex);
         } else {
@@ -154,8 +166,6 @@ export class Bot {
             this.setHarvestTimer(slotIndex, newEndsAt);
             logger.success(`Slot ${slotIndex} ditanami ${this.config.seedKey}.`);
 
-            // [DIHAPUS] Panggilan booster paksa dihapus dari sini.
-            // Logika booster sekarang hanya ditangani oleh timernya sendiri atau saat inisialisasi.
         } else {
             logger.error(`Gagal menanam di slot ${slotIndex}. Mencoba lagi dalam 1 menit.`);
             setTimeout(() => this.handlePlanting(slotIndex), 60000);
@@ -165,20 +175,16 @@ export class Bot {
     async handleBoosterApplication(slotIndex) {
         if (!this.isRunning || !this.config.boosterKey) return;
 
-        // [DIUBAH] Logika pengecekan yang lebih cerdas
         const { state } = await api.getState();
         const currentSlot = state.plots.find(p => p.slotIndex === slotIndex);
 
-        // Batalkan jika slot kosong
         if (!currentSlot || !currentSlot.seed) {
             logger.debug(`Slot ${slotIndex} kosong, aplikasi booster dibatalkan.`);
             return;
         }
 
-        // Batalkan jika sudah ada booster yang aktif
         if (currentSlot.modifier && new Date(currentSlot.modifier.endsAt).getTime() > Date.now()) {
             logger.debug(`Slot ${slotIndex} sudah memiliki booster aktif. Aplikasi dibatalkan.`);
-            // Pastikan timer untuk booster yang ada sudah benar
             this.setBoosterTimer(slotIndex, new Date(currentSlot.modifier.endsAt).getTime());
             return;
         }
@@ -214,9 +220,6 @@ export class Bot {
         }
     }
 
-    /**
-     * [DIUBAH] Menampilkan status countdown yang akurat.
-     */
     displayStatus() {
         const now = Date.now();
         let nextHarvestSlot = null;
