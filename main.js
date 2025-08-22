@@ -69,7 +69,7 @@ async function start() {
             process.exit(1);
         }
 
-        // [DIUBAH] Menampilkan data yang lebih lengkap dan akurat
+        // Menampilkan data yang lebih lengkap dan akurat
         const user = initialState.user;
         logger.success(`Terhubung sebagai: ${user?.rewardWalletAddress || 'Unknown'}`);
         logger.info(`💰 Saldo: ${user?.coins || 0} koin | ${user?.ap || 0} AP (apel)`);
@@ -81,20 +81,27 @@ async function start() {
         let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : DEFAULT_SETTINGS.SLOTS;
         if (!slots.length) slots = DEFAULT_SETTINGS.SLOTS;
 
-        const seedKey = (await askQuestion(`Pilih bibit [default: ${DEFAULT_SETTINGS.SEED}]: `) || DEFAULT_SETTINGS.SEED).toLowerCase();
+        // [DIUBAH] Menampilkan daftar bibit sebelum bertanya
+        console.log('\n--- Bibit Tersedia ---');
+        Object.keys(SEEDS).forEach(key => console.log(`- ${key}`));
+        const seedKey = (await askQuestion(`\nPilih bibit [default: ${DEFAULT_SETTINGS.SEED}]: `) || DEFAULT_SETTINGS.SEED).toLowerCase();
         if (!SEEDS[seedKey]) {
             logger.error(`Bibit '${seedKey}' tidak dikenal.`);
             process.exit(1);
         }
 
-        const boosterKey = (await askQuestion(`Pilih booster (ketik 'none' untuk tanpa booster) [default: ${DEFAULT_SETTINGS.BOOSTER}]: `) || DEFAULT_SETTINGS.BOOSTER).toLowerCase();
+        // [DIUBAH] Menampilkan daftar booster sebelum bertanya
+        console.log('\n--- Booster Tersedia ---');
+        Object.keys(BOOSTERS).forEach(key => console.log(`- ${key}`));
+        console.log(`- none`);
+        const boosterKey = (await askQuestion(`\nPilih booster (ketik 'none' untuk tanpa booster) [default: ${DEFAULT_SETTINGS.BOOSTER}]: `) || DEFAULT_SETTINGS.BOOSTER).toLowerCase();
         if (boosterKey !== 'none' && !BOOSTERS[boosterKey]) {
             logger.error(`Booster '${boosterKey}' tidak dikenal.`);
             process.exit(1);
         }
 
         // Menambahkan kembali pertanyaan untuk jumlah pembelian
-        const seedBuyQtyAns = await askQuestion(`Jumlah pembelian bibit saat habis [default: ${DEFAULT_SETTINGS.BUY_QTY_SEED}]: `);
+        const seedBuyQtyAns = await askQuestion(`\nJumlah pembelian bibit saat habis [default: ${DEFAULT_SETTINGS.BUY_QTY_SEED}]: `);
         const seedBuyQty = parseInt(seedBuyQtyAns, 10) || DEFAULT_SETTINGS.BUY_QTY_SEED;
 
         let boosterBuyQty = DEFAULT_SETTINGS.BUY_QTY_BOOSTER;

@@ -14,7 +14,6 @@ export class Bot {
         this.config = config;
         this.plantTimers = new Map();
         this.boosterTimers = new Map();
-        // [BARU] Menyimpan state waktu selesai untuk display
         this.slotStates = new Map();
         this.isRunning = false;
         this.statusInterval = null;
@@ -30,10 +29,8 @@ export class Bot {
         const { state } = await api.getState();
         await this.initializeSlots(state);
 
-        // Memulai status display
-        this.statusInterval = setInterval(() => this.displayStatus(), 1000); // Update tiap detik
+        this.statusInterval = setInterval(() => this.displayStatus(), 1000);
 
-        // Menangani sinyal berhenti (Ctrl+C)
         process.on('SIGINT', () => this.stop());
     }
 
@@ -45,7 +42,6 @@ export class Bot {
         this.isRunning = false;
         logger.warn('Menghentikan bot...');
 
-        // Hapus semua timer yang sedang berjalan untuk mencegah memory leak
         this.plantTimers.forEach(timer => clearTimeout(timer));
         this.boosterTimers.forEach(timer => clearTimeout(timer));
         clearInterval(this.statusInterval);
@@ -72,7 +68,6 @@ export class Bot {
             if (slot?.modifier) {
                 this.setBoosterTimer(slotIndex, new Date(slot.modifier.endsAt).getTime());
             } else if (this.config.boosterKey && slot?.seed) {
-                // Hanya pasang booster jika sudah ada tanaman dan belum ada booster
                 await this.handleBoosterApplication(slotIndex);
             }
         }
@@ -81,7 +76,6 @@ export class Bot {
     // --- MANAJEMEN TIMER ---
 
     setHarvestTimer(slotIndex, endsAt) {
-        // [DIUBAH] Simpan waktu selesai untuk display
         this.slotStates.set(slotIndex, { ...this.slotStates.get(slotIndex), plantEndsAt: endsAt });
 
         const duration = endsAt - Date.now();
@@ -97,7 +91,6 @@ export class Bot {
     }
 
     setBoosterTimer(slotIndex, endsAt) {
-        // [DIUBAH] Simpan waktu selesai untuk display
         this.slotStates.set(slotIndex, { ...this.slotStates.get(slotIndex), boosterEndsAt: endsAt });
 
         const duration = endsAt - Date.now();
@@ -114,7 +107,7 @@ export class Bot {
 
     // --- SIKLUS AKSI PER SLOT ---
 
-    async handleHarvest(slotIndex) {
+    async handleHarvest(slotIndex, retryCount = 0) {
         if (!this.isRunning) return;
         this.plantTimers.delete(slotIndex);
         this.slotStates.delete(slotIndex);
@@ -122,16 +115,13 @@ export class Bot {
 
         const result = await api.harvestSlot(slotIndex);
         if (result.ok) {
-            // [DIPERBAIKI] Log panen sekarang menampilkan AP jika ada.
             const earnings = result.data.plotResults[0];
             const coins = Math.round(earnings.coinsEarned || 0);
             const ap = Math.round(earnings.apEarned || 0);
             const xp = Math.round(earnings.xpGained || 0);
 
             let logMessage = `Slot ${slotIndex} dipanen: +${coins} koin`;
-            if (ap > 0) {
-                logMessage += `, +${ap} AP`;
-            }
+            if (ap > 0) logMessage += `, +${ap} AP`;
             logMessage += `, +${xp} XP.`;
 
             logger.success(logMessage);
@@ -139,12 +129,18 @@ export class Bot {
             await sleep(500);
             await this.handlePlanting(slotIndex);
         } else {
-            logger.error(`Gagal memanen slot ${slotIndex}. Mencoba lagi dalam 1 menit.`);
-            setTimeout(() => this.handleHarvest(slotIndex), 60000);
+            // [DIUBAH] Logika coba lagi jika gagal
+            if (retryCount < 3) {
+                const nextAttempt = retryCount + 1;
+                logger.error(`Gagal memanen slot ${slotIndex}. Mencoba lagi... (${nextAttempt}/3)`);
+                setTimeout(() => this.handleHarvest(slotIndex, nextAttempt), 5000); // Coba lagi dalam 5 detik
+            } else {
+                logger.error(`Gagal total memanen slot ${slotIndex} setelah 3 percobaan. Slot diabaikan sementara.`);
+            }
         }
     }
 
-    async handlePlanting(slotIndex) {
+    async handlePlanting(slotIndex, retryCount = 0) {
         if (!this.isRunning) return;
         logger.action('plant', `Menanam di slot ${slotIndex}...`);
 
@@ -153,8 +149,10 @@ export class Bot {
             logger.warn(`Bibit ${this.config.seedKey} habis. Membeli ${this.config.seedBuyQty}...`);
             const buyResult = await api.buyItem(this.config.seedKey, this.config.seedBuyQty);
             if (!buyResult.ok) {
-                logger.error(`Gagal membeli bibit. Mencoba lagi dalam 1 menit.`);
-                setTimeout(() => this.handlePlanting(slotIndex), 60000);
+                logger.error(`Gagal membeli bibit. Aksi menanam akan diulang.`);
+                if (retryCount < 3) {
+                    setTimeout(() => this.handlePlanting(slotIndex, retryCount + 1), 5000);
+                }
                 return;
             }
             logger.success('Berhasil membeli bibit.');
@@ -165,14 +163,19 @@ export class Bot {
             const newEndsAt = new Date(plantResult.data.plotResults[0].endsAt).getTime();
             this.setHarvestTimer(slotIndex, newEndsAt);
             logger.success(`Slot ${slotIndex} ditanami ${this.config.seedKey}.`);
-
         } else {
-            logger.error(`Gagal menanam di slot ${slotIndex}. Mencoba lagi dalam 1 menit.`);
-            setTimeout(() => this.handlePlanting(slotIndex), 60000);
+            // [DIUBAH] Logika coba lagi jika gagal
+            if (retryCount < 3) {
+                const nextAttempt = retryCount + 1;
+                logger.error(`Gagal menanam di slot ${slotIndex}. Mencoba lagi... (${nextAttempt}/3)`);
+                setTimeout(() => this.handlePlanting(slotIndex, nextAttempt), 5000);
+            } else {
+                logger.error(`Gagal total menanam di slot ${slotIndex} setelah 3 percobaan.`);
+            }
         }
     }
 
-    async handleBoosterApplication(slotIndex) {
+    async handleBoosterApplication(slotIndex, retryCount = 0) {
         if (!this.isRunning || !this.config.boosterKey) return;
 
         const { state } = await api.getState();
@@ -195,8 +198,10 @@ export class Bot {
             logger.warn(`Booster ${this.config.boosterKey} habis. Membeli ${this.config.boosterBuyQty}...`);
             const buyResult = await api.buyItem(this.config.boosterKey, this.config.boosterBuyQty);
             if (!buyResult.ok) {
-                logger.error(`Gagal membeli booster. Mencoba lagi dalam 1 menit.`);
-                setTimeout(() => this.handleBoosterApplication(slotIndex), 60000);
+                logger.error(`Gagal membeli booster. Aksi memasang booster akan diulang.`);
+                if (retryCount < 3) {
+                    setTimeout(() => this.handleBoosterApplication(slotIndex, retryCount + 1), 5000);
+                }
                 return;
             }
             logger.success('Berhasil membeli booster.');
@@ -216,7 +221,14 @@ export class Bot {
                 this.setBoosterTimer(slotIndex, new Date(updatedSlot.modifier.endsAt).getTime());
             }
         } else {
-            logger.error(`Gagal memasang booster di slot ${slotIndex}.`);
+            // [DIUBAH] Logika coba lagi jika gagal
+            if (retryCount < 3) {
+                const nextAttempt = retryCount + 1;
+                logger.error(`Gagal memasang booster di slot ${slotIndex}. Mencoba lagi... (${nextAttempt}/3)`);
+                setTimeout(() => this.handleBoosterApplication(slotIndex, nextAttempt), 5000);
+            } else {
+                logger.error(`Gagal total memasang booster di slot ${slotIndex} setelah 3 percobaan.`);
+            }
         }
     }
 
