@@ -1,115 +1,105 @@
-# 🌱 AppleVille Smart Bot — Table Ticker + Clean Logs
+# 🤖 AppleVille Smart Bot — Arsitektur Modern & Andal
 
-Bot Node.js untuk otomatis **cek/plant/booster/harvest** dan menampilkan countdown **per-slot** dalam tabel rapi (anti-spam) menggunakan [`log-update`](https://www.npmjs.com/package/log-update), [`cli-table3`](https://www.npmjs.com/package/cli-table3), dan [`picocolors`](https://www.npmjs.com/package/picocolors).
+Bot Node.js yang dirancang ulang dengan arsitektur modern untuk otomatisasi **tanam, booster, dan panen** di AppleVille. Bot ini beroperasi dengan presisi tinggi, mengelola setiap slot secara independen dan paralel tanpa memerlukan dependensi eksternal.
 
 ---
 
-## ✨ Fitur
+## ✨ Fitur Unggulan
 
-- **Ticker tabel 2 tingkat**: ringkas, jelas, tidak nyepam.
-- **Smart countdown**: tampilkan waktu sisa **P:** (plant/crop) & **B:** (booster) untuk tiap slot.
-- **Auto apply booster** pada slot yang belum/kehabisan booster (termasuk pembelian otomatis bila stok kurang).
-- **Update `endsAt`** setelah booster diterapkan/diperbarui di tengah grow.
-- **COOKIE via `akun.txt`**: jika belum ada, bot minta input cookie 1x lalu menyimpannya otomatis.
-
-> **Catatan:** Script ini hanya memanggil endpoint TRPC publik AppleVille seperti yang dilakukan web-app nya.
+-   **Manajemen Timer Paralel**: Setiap slot tanaman dan booster memiliki *timer* presisinya sendiri yang berjalan secara independen, memastikan aksi dieksekusi tepat waktu.
+-   **Logika Cerdas & Andal**: Bot tidak akan memaksakan aksi. Ia akan menunggu *booster* yang ada selesai sebelum memasang yang baru dan menangani setiap slot secara individual untuk mencegah kegagalan berantai.
+-   **Nol Dependensi Eksternal**: Dijalankan murni dengan Node.js bawaan. Tidak perlu `npm install`, membuat setup menjadi super ringan dan cepat.
+-   **Ringan & Efisien**: Kode yang bersih dan modular memudahkan pemahaman, modifikasi, dan *debugging*.
+-   **Setup Cookie Otomatis**: Cukup jalankan sekali, bot akan meminta *cookie* Anda dan menyimpannya di `akun.txt` untuk penggunaan selanjutnya.
 
 ---
 
 ## 🔧 Prasyarat
 
-- **Node.js 18+** (disarankan Node 20/22).
-- Sudah login AppleVille di browser (punya **cookie** session yang valid).
+-   **Node.js v18+** (disarankan v20 atau yang lebih baru).
+-   **Git** (untuk metode instalasi yang disarankan).
 
 ---
 
-## 📦 Instalasi
+## 📦 Instalasi & Setup
 
-```bash
-# (opsional) clone code
-git clone https://github.com/caraka15/appleville-bot
+### Opsi 1: Git Clone (Disarankan)
 
-# buka folder
-cd appleville-bot
+Ini adalah cara termudah dan tercepat untuk memulai.
 
-# install dependencies tampilan terminal
-npm i log-update cli-table3 picocolors fs path
-```
+1.  **Clone Repositori**: Buka terminal Anda dan jalankan perintah berikut.
+    ```bash
+    git clone https://github.com/caraka15/appleville-bot.git
+    ```
 
-> Script memakai **fetch bawaan Node 18+**, jadi tidak perlu `node-fetch`.
+2.  **Masuk ke Folder**:
+    ```bash
+    cd appleville-bot
+    ```
+
+Selesai! Tidak ada `npm install` yang diperlukan. Proyek sudah siap dijalankan karena `package.json` sudah termasuk di dalamnya.
+
+### Opsi 2: Setup Manual
+
+Gunakan cara ini jika Anda tidak bisa menggunakan Git.
+
+1.  **Unduh & Buka Folder**: Dapatkan semua file proyek (`main.js`, `config.js`, folder `core`, `services`, `utils`) dan letakkan di dalam satu folder.
+2.  **Inisialisasi Proyek**: Buka terminal di dalam folder tersebut dan jalankan perintah ini untuk membuat file `package.json`.
+    ```bash
+    npm init -y
+    ```
+3.  **Aktifkan ES Modules**: Buka file `package.json` yang baru dibuat, dan tambahkan baris berikut untuk mengaktifkan sintaks `import`/`export` modern.
+    ```json
+    "type": "module",
+    ```
 
 ---
 
 ## 🔑 Setup Cookie (`akun.txt`)
 
---**Cara mengambil cookies***: buka inspect atau ctrl+f12, buka network, cari api bernama auth.me pada header ada cookies, copy semua
-<img width="644" height="469" alt="image" src="https://github.com/user-attachments/assets/2f566489-44c2-4004-bc3e-95574421387c" />
+Bot memerlukan *cookie* sesi Anda untuk berinteraksi dengan server.
 
+-   **Cara Mendapatkan Cookie**:
+    1.  Buka AppleVille di browser Anda dan login.
+    2.  Tekan `F12` untuk membuka Developer Tools.
+    3.  Buka tab **Network** (Jaringan).
+    4.  Cari *request* apa pun ke API (misalnya, `getState` atau `harvest`).
+    5.  Di bagian **Headers**, cari *request header* bernama `cookie`.
+    6.  **Copy seluruh nilai** dari header `cookie` tersebut.
 
-
-- **Otomatis (disarankan)**: saat pertama kali menjalankan, jika `akun.txt` belum ada/kosong, bot akan **meminta cookie** di terminal dan **menyimpannya** ke `akun.txt`.
-
-**Keamanan:** `akun.txt` berisi kredensial. **JANGAN commit** file ini. Lihat `.gitignore` di bawah.
+-   **Penggunaan**:
+    Saat Anda menjalankan bot untuk pertama kali, ia akan meminta Anda untuk mem-paste *cookie* tersebut. Setelah itu, *cookie* akan disimpan di `akun.txt` dan tidak akan diminta lagi.
 
 ---
 
-## ▶️ Menjalankan
+## ▶️ Menjalankan Bot
+
+Pastikan Anda berada di direktori utama proyek di terminal Anda, lalu jalankan:
 
 ```bash
-node apple.js
+node main.js
 ```
 
-Ikuti prompt:
-
-- Masukkan **slot** (misal: `1,2,3,4,5,6,7,8,9,10,11,12`).
-- Pilih **seed** (misal: `royal-apple`).
-- Masukkan **buy quantity** seed saat habis (misal: `12`).
-- Pilih **booster** (misal: `quantum-fertilizer`).
-- Masukkan **buy quantity** booster saat habis (misal: `12`).
-
-> Tampilan terminal akan memperlihatkan **tabel** dengan countdown **P:** (plant) dan **B:** (booster) untuk tiap slot, disortir berdasarkan waktu panen terdekat.
+Bot akan memandu Anda melalui beberapa pertanyaan konfigurasi awal (slot, bibit, booster) dan kemudian akan mulai beroperasi secara otomatis.
 
 ---
 
-## 🖥️ Opsi Terminal
+## 🎛️ Konfigurasi
 
-- `--plain` → non-warna (untuk terminal lama/CI).
-- `--ascii` → tanpa emoji/border Unicode.
-
-> Fallback non-TTY: bila terminal tidak mendukung _live update_, bot akan mencetak ringkasan berkala agar tidak spam.
+Semua pengaturan utama dapat diubah langsung di dalam file `config.js`, termasuk:
+-   `DEBUG_MODE`: Ubah menjadi `true` untuk melihat log *debug* yang detail.
+-   Pengaturan default untuk bibit, booster, dan jumlah pembelian.
 
 ---
 
 ## 🧰 Troubleshooting
 
-- **Karakter aneh “B�” di Windows** → jalankan dengan `--ascii` atau gunakan Windows Terminal/VS Code Terminal.
-- **`TypeError: logUpdate is not a function`** → pastikan `npm i log-update` sudah dilakukan **di folder yang sama**.
-- **Bot tidak panen/plant** → cookie expired. Ambil cookie baru (login ulang di browser), lalu hapus isi `akun.txt` dan jalankan lagi (bot akan minta input cookie baru).
-- **`Node 18+ diperlukan (fetch builtin)`** → upgrade Node.js Anda.
-
----
-
-## 🔒 .gitignore (disarankan)
-
-Tambahkan file `.gitignore` berikut agar kredensial tidak ikut ter-commit:
-
-```gitignore
-# dependencies
-node_modules/
-
-# logs & cache
-npm-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-.DS_Store
-
-# env / secrets
-.env
-akun.txt
-```
+-   **Error `SyntaxError: Cannot use import statement outside a module`**: Pastikan Anda sudah menambahkan `"type": "module"` di dalam `package.json` (hanya untuk setup manual).
+-   **Bot Gagal Terhubung / Error 401**: Kemungkinan besar *cookie* Anda sudah kedaluwarsa. Hapus file `akun.txt` dan jalankan ulang bot. Ia akan meminta Anda untuk memasukkan *cookie* yang baru.
+-   **Bot Gagal Memasang Booster (Error 400)**: Pastikan Anda tidak menjalankan beberapa instance bot secara bersamaan, karena ini dapat menyebabkan konflik aksi.
 
 ---
 
 ## ⚠️ Disclaimer
 
-Script ini bukan bagian resmi dari AppleVille. Gunakan sesuai kebijakan layanan. Segala risiko ditanggung pengguna.
+Ini adalah proyek tidak resmi dan tidak berafiliasi dengan AppleVille. Gunakan dengan bijak dan segala risiko ditanggung oleh pengguna.
