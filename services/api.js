@@ -32,8 +32,13 @@ async function fetchWithRetry(url, options, retries = API_SETTINGS.MAX_RETRIES) 
             const response = await fetch(url, { ...options, signal: controller.signal });
             clearTimeout(timeoutId);
 
+            // [DIPERBAIKI] Menangkap dan menampilkan body dari response error.
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                let errorBody = 'Could not read error body.';
+                try {
+                    errorBody = await response.text();
+                } catch { }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${errorBody}`);
             }
             return response;
         } catch (error) {
