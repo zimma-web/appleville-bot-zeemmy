@@ -22,6 +22,16 @@ const askQuestion = (question) => {
     });
 };
 
+// [BARU] Helper function untuk format waktu
+const formatSeconds = (s) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${ss}s`;
+    return `${ss}s`;
+};
+
 async function ensureCookieInteractive() {
     const cookieFile = path.join(process.cwd(), 'akun.txt');
     try {
@@ -77,22 +87,31 @@ async function start() {
 
 
         // Kumpulkan konfigurasi dari pengguna
-        const slotsAns = await askQuestion(`\nMasukkan slot (mis: 1,2,3) [default: semua]: `);
+        const slotsAns = await askQuestion(`\nMasukkan slot (mis: 1,2,3) [default: 1,2,3,4,5,6,7,8,9,10,11,12]: `);
         let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : DEFAULT_SETTINGS.SLOTS;
         if (!slots.length) slots = DEFAULT_SETTINGS.SLOTS;
 
-        // [DIUBAH] Menampilkan daftar bibit sebelum bertanya
+        // [DIUBAH] Menampilkan daftar bibit dengan informasi lengkap
         console.log('\n--- Bibit Tersedia ---');
-        Object.keys(SEEDS).forEach(key => console.log(`- ${key}`));
+        Object.entries(SEEDS).forEach(([key, seedData]) => {
+            const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
+            const prestigeInfo = seedData.prestige ? ` (Prestige: ${seedData.prestige})` : '';
+            const rewardInfo = seedData.reward ? ` | Reward: ${seedData.rewardCurrency === 'coins' ? '🪙' : '🍎'} ${seedData.reward}` : '';
+            console.log(`- ${key.padEnd(18, ' ')} ${growTime.padEnd(10, ' ')}${rewardInfo}${prestigeInfo}`);
+        });
         const seedKey = (await askQuestion(`\nPilih bibit [default: ${DEFAULT_SETTINGS.SEED}]: `) || DEFAULT_SETTINGS.SEED).toLowerCase();
         if (!SEEDS[seedKey]) {
             logger.error(`Bibit '${seedKey}' tidak dikenal.`);
             process.exit(1);
         }
 
-        // [DIUBAH] Menampilkan daftar booster sebelum bertanya
+        // [DIUBAH] Menampilkan daftar booster dengan informasi lengkap
         console.log('\n--- Booster Tersedia ---');
-        Object.keys(BOOSTERS).forEach(key => console.log(`- ${key}`));
+        Object.entries(BOOSTERS).forEach(([key, boosterData]) => {
+            const prestigeInfo = boosterData.prestige ? ` (Prestige: ${boosterData.prestige})` : '';
+            const effectInfo = boosterData.effect ? ` | ${boosterData.effect}` : '';
+            console.log(`- ${key.padEnd(20, ' ')}${effectInfo}${prestigeInfo}`);
+        });
         console.log(`- none`);
         const boosterKey = (await askQuestion(`\nPilih booster (ketik 'none' untuk tanpa booster) [default: ${DEFAULT_SETTINGS.BOOSTER}]: `) || DEFAULT_SETTINGS.BOOSTER).toLowerCase();
         if (boosterKey !== 'none' && !BOOSTERS[boosterKey]) {
