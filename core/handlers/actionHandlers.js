@@ -13,6 +13,45 @@ function inventoryCount(state, key) {
     return item?.quantity || 0;
 }
 
+// [LOGIKA BARU] Fungsi terpusat yang sepenuhnya anti-race condition
+async function purchaseItemIfNeeded(bot, itemType) {
+    const isSeed = itemType === 'seed';
+    const lock = isSeed ? 'isBuyingSeed' : 'isBuyingBooster';
+    const key = isSeed ? bot.config.seedKey : bot.config.boosterKey;
+    const buyQty = isSeed ? bot.config.seedBuyQty : bot.config.boosterBuyQty;
+
+    // Jika proses lain sedang membeli, tunggu dengan sabar.
+    if (bot[lock]) {
+        logger.debug(`Pembelian ${itemType} sudah berjalan, proses ini menunggu...`);
+        while (bot[lock]) {
+            await sleep(500);
+        }
+        return; // Setelah menunggu, stok seharusnya sudah ada.
+    }
+
+    try {
+        // Ambil kunci terlebih dahulu untuk mencegah proses lain masuk.
+        bot[lock] = true;
+
+        // Setelah mendapatkan kunci, periksa apakah pembelian masih diperlukan.
+        const { state } = await api.getState();
+        if (inventoryCount(state, key) < 1) {
+            logger.warn(`${isSeed ? 'Bibit' : 'Booster'} ${key} habis. Membeli ${buyQty}...`);
+            const buyResult = await api.buyItem(key, buyQty);
+            if (!buyResult.ok) {
+                throw new Error(`Gagal membeli ${itemType}.`);
+            }
+            logger.success(`Berhasil membeli ${itemType}.`);
+        } else {
+            logger.debug(`Stok ${itemType} sudah ada, pembelian dibatalkan.`);
+        }
+    } finally {
+        // Apapun yang terjadi, selalu lepaskan kunci.
+        bot[lock] = false;
+    }
+}
+
+
 export async function handleHarvest(bot, slotIndex, retryCount = 0) {
     if (!bot.isRunning || bot.isPausedForCaptcha) return;
     bot.plantTimers.delete(slotIndex);
@@ -49,21 +88,12 @@ export async function handleHarvest(bot, slotIndex, retryCount = 0) {
 
 export async function handlePlanting(bot, slotIndex, retryCount = 0) {
     if (!bot.isRunning || bot.isPausedForCaptcha) return;
-    if (bot.isBuyingSeed) {
-        setTimeout(() => handlePlanting(bot, slotIndex), 2500);
-        return;
-    }
+
     try {
+        // [DIUBAH] Selalu pastikan stok ada sebelum menanam
+        await purchaseItemIfNeeded(bot, 'seed');
+
         logger.action('plant', `Menanam di slot ${slotIndex}...`);
-        let { state } = await api.getState();
-        if (inventoryCount(state, bot.config.seedKey) < 1) {
-            bot.isBuyingSeed = true;
-            logger.warn(`Bibit ${bot.config.seedKey} habis. Membeli ${bot.config.seedBuyQty}...`);
-            const buyResult = await api.buyItem(bot.config.seedKey, bot.config.seedBuyQty);
-            bot.isBuyingSeed = false;
-            if (!buyResult.ok) throw new Error('Gagal membeli bibit.');
-            logger.success('Berhasil membeli bibit.');
-        }
         const plantResult = await api.plantSeed(slotIndex, bot.config.seedKey);
         if (plantResult.ok) {
             const newEndsAt = new Date(plantResult.data.plotResults[0].endsAt).getTime();
@@ -75,11 +105,16 @@ export async function handlePlanting(bot, slotIndex, retryCount = 0) {
                 await handleBoosterApplication(bot, slotIndex);
             }
         } else {
+            // Jika gagal karena race condition (slot lain memakai bibit terakhir), coba lagi.
+            if (plantResult.error?.message?.includes('Not enough')) {
+                logger.warn(`Slot ${slotIndex} gagal tanam karena bibit habis (race condition). Mencoba lagi segera.`);
+                setTimeout(() => handlePlanting(bot, slotIndex, 0), 500);
+                return;
+            }
             throw new Error(plantResult.error?.message || 'Unknown planting error');
         }
     } catch (error) {
         if (error instanceof CaptchaError) return bot.handleCaptchaRequired();
-        if (bot.isBuyingSeed) bot.isBuyingSeed = false;
         if (retryCount < 3) {
             const nextAttempt = retryCount + 1;
             logger.error(`Gagal menanam di slot ${slotIndex}: ${error.message}. Mencoba lagi... (${nextAttempt}/3)`);
@@ -92,10 +127,7 @@ export async function handlePlanting(bot, slotIndex, retryCount = 0) {
 
 export async function handleBoosterApplication(bot, slotIndex, retryCount = 0) {
     if (!bot.isRunning || !bot.config.boosterKey || bot.isPausedForCaptcha) return;
-    if (bot.isBuyingBooster) {
-        setTimeout(() => handleBoosterApplication(bot, slotIndex), 2500);
-        return;
-    }
+
     try {
         const { state } = await api.getState();
         const currentSlot = state.plots.find(p => p.slotIndex === slotIndex);
@@ -104,15 +136,11 @@ export async function handleBoosterApplication(bot, slotIndex, retryCount = 0) {
             bot.setBoosterTimer(slotIndex, new Date(currentSlot.modifier.endsAt).getTime());
             return;
         }
+
+        // [DIUBAH] Selalu pastikan stok ada sebelum memasang
+        await purchaseItemIfNeeded(bot, 'booster');
+
         logger.action('boost', `Memasang booster di slot ${slotIndex}...`);
-        if (inventoryCount(state, bot.config.boosterKey) < 1) {
-            bot.isBuyingBooster = true;
-            logger.warn(`Booster ${bot.config.boosterKey} habis. Membeli ${bot.config.boosterBuyQty}...`);
-            const buyResult = await api.buyItem(bot.config.boosterKey, bot.config.boosterBuyQty);
-            bot.isBuyingBooster = false;
-            if (!buyResult.ok) throw new Error('Gagal membeli booster.');
-            logger.success('Berhasil membeli booster.');
-        }
         const applyResult = await api.applyModifier(slotIndex, bot.config.boosterKey);
         if (applyResult.ok) {
             logger.success(`Booster ${bot.config.boosterKey} terpasang di slot ${slotIndex}.`);
@@ -126,11 +154,15 @@ export async function handleBoosterApplication(bot, slotIndex, retryCount = 0) {
                 bot.setBoosterTimer(slotIndex, new Date(updatedSlot.modifier.endsAt).getTime());
             }
         } else {
+            if (applyResult.error?.message?.includes('Not enough')) {
+                logger.warn(`Slot ${slotIndex} gagal pasang booster karena habis (race condition). Mencoba lagi segera.`);
+                setTimeout(() => handleBoosterApplication(bot, slotIndex, 0), 500);
+                return;
+            }
             throw new Error(applyResult.error?.message || 'Unknown booster application error');
         }
     } catch (error) {
         if (error instanceof CaptchaError) return bot.handleCaptchaRequired();
-        if (bot.isBuyingBooster) bot.isBuyingBooster = false;
         if (retryCount < 3) {
             const nextAttempt = retryCount + 1;
             logger.error(`Gagal memasang booster di slot ${slotIndex}: ${error.message}. Mencoba lagi... (${nextAttempt}/3)`);

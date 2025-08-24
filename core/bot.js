@@ -28,7 +28,6 @@ export class Bot {
 
     async start() {
         this.isRunning = true;
-        logger.info('Konfigurasi bot selesai. Memulai...');
         logger.success('Bot berhasil dimulai. Tekan Ctrl+C untuk berhenti.');
 
         try {
@@ -73,8 +72,6 @@ export class Bot {
         this.boosterTimers.clear();
 
         const slotMap = new Map(initialState.plots.map(p => [p.slotIndex, p]));
-
-        // [DIHAPUS] Log status awal dipindahkan ke main.js
 
         for (const slotIndex of this.config.slots) {
             if (!this.isRunning) break;

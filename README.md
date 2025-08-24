@@ -1,104 +1,84 @@
 # 🤖 AppleVille Smart Bot — Arsitektur Modern & Andal
 
-Bot Node.js yang dirancang ulang dengan arsitektur modern untuk otomatisasi **tanam, booster, dan panen** di AppleVille. Bot ini beroperasi dengan presisi tinggi, mengelola setiap slot secara independen dan paralel tanpa memerlukan dependensi eksternal.
-
----
+Bot Node.js yang dirancang ulang dengan arsitektur modern untuk otomatisasi **tanam, booster, dan panen** di AppleVille. Bot ini beroperasi dengan presisi tinggi, mengelola setiap slot secara independen dan paralel, serta dilengkapi dengan notifikasi Telegram cerdas.
 
 ## ✨ Fitur Unggulan
 
--   **Manajemen Timer Paralel**: Setiap slot tanaman dan booster memiliki *timer* presisinya sendiri yang berjalan secara independen, memastikan aksi dieksekusi tepat waktu.
--   **Logika Cerdas & Andal**: Bot tidak akan memaksakan aksi. Ia akan menunggu *booster* yang ada selesai sebelum memasang yang baru dan menangani setiap slot secara individual untuk mencegah kegagalan berantai.
--   **Nol Dependensi Eksternal**: Dijalankan murni dengan Node.js bawaan. Tidak perlu `npm install`, membuat setup menjadi super ringan dan cepat.
--   **Ringan & Efisien**: Kode yang bersih dan modular memudahkan pemahaman, modifikasi, dan *debugging*.
--   **Setup Cookie Otomatis**: Cukup jalankan sekali, bot akan meminta *cookie* Anda dan menyimpannya di `akun.txt` untuk penggunaan selanjutnya.
+- **Manajemen Timer Paralel**: Setiap slot tanaman dan booster memiliki _timer_ presisinya sendiri yang berjalan secara independen, memastikan aksi dieksekusi tepat waktu.
 
----
+- **Notifikasi Telegram Cerdas**:
+
+  - Memberi tahu Anda saat **CAPTCHA dibutuhkan**, lengkap dengan identitas akun.
+
+  - Bot akan **dijeda secara otomatis** dan mencoba kembali setiap 2 menit.
+
+  - Memberi tahu Anda saat **CAPTCHA berhasil diselesaikan** dan bot berjalan kembali.
+
+  - Memberi tahu Anda saat **AP sudah cukup** untuk upgrade ke level _prestige_ berikutnya.
+
+- **Antarmuka Informatif**:
+
+  - Menampilkan status awal semua slot, saldo, dan target _prestige_ berikutnya saat bot dimulai.
+
+  - Daftar bibit dan booster **disaring secara otomatis** sesuai level _prestige_ Anda.
+
+- **Logika Andal & Anti-Crash**:
+
+  - Dilengkapi sistem "kunci" untuk mencegah _race condition_ saat membeli item.
+
+  - Semua aksi dibungkus `try...catch` dengan mekanisme coba lagi, memastikan bot **tidak akan berhenti** karena error API.
+
+- **Nol Dependensi Eksternal**: Dijalankan murni dengan Node.js bawaan. Tidak perlu `npm install`.
 
 ## 🔧 Prasyarat
 
--   **Node.js v18+** (disarankan v20 atau yang lebih baru).
--   **Git** (untuk metode instalasi yang disarankan).
+- **Node.js v18+** (disarankan v20 atau yang lebih baru).
 
----
+- **Git** (untuk metode instalasi yang disarankan).
 
 ## 📦 Instalasi & Setup
 
-### Opsi 1: Git Clone (Disarankan)
-
 Ini adalah cara termudah dan tercepat untuk memulai.
 
-1.  **Clone Repositori**: Buka terminal Anda dan jalankan perintah berikut.
-    ```bash
-    git clone https://github.com/caraka15/appleville-bot.git
-    ```
+1. **Clone Repositori**: Buka terminal Anda dan jalankan perintah berikut.
 
-2.  **Masuk ke Folder**:
-    ```bash
-    cd appleville-bot
-    ```
+   ```
+   git clone [https://github.com/caraka15/appleville-bot.git](https://github.com/caraka15/appleville-bot.git)
+   ```
 
-Selesai! Tidak ada `npm install` yang diperlukan. Proyek sudah siap dijalankan karena `package.json` sudah termasuk di dalamnya.
+2. **Masuk ke Folder**:
 
-### Opsi 2: Setup Manual
+   ```
+   cd appleville-bot
+   ```
 
-Gunakan cara ini jika Anda tidak bisa menggunakan Git.
+Selesai! Proyek sudah siap dijalankan.
 
-1.  **Unduh & Buka Folder**: Dapatkan semua file proyek (`main.js`, `config.js`, folder `core`, `services`, `utils`) dan letakkan di dalam satu folder.
-2.  **Inisialisasi Proyek**: Buka terminal di dalam folder tersebut dan jalankan perintah ini untuk membuat file `package.json`.
-    ```bash
-    npm init -y
-    ```
-3.  **Aktifkan ES Modules**: Buka file `package.json` yang baru dibuat, dan tambahkan baris berikut untuk mengaktifkan sintaks `import`/`export` modern.
-    ```json
-    "type": "module",
-    ```
+## 🔑 Setup Awal (Hanya Sekali Jalan)
 
----
+Saat Anda menjalankan bot untuk pertama kali, ia akan memandu Anda melalui setup interaktif:
 
-## 🔑 Setup Cookie (`akun.txt`)
+1. **Setup Cookie**: Bot akan meminta Anda untuk memasukkan _cookie_ dan menyimpannya di `akun.txt`.
 
-Bot memerlukan *cookie* sesi Anda untuk berinteraksi dengan server.
+2. **Setup Telegram**: Bot akan bertanya apakah Anda ingin mengatur notifikasi. Jika ya, ia akan meminta Token Bot dan Chat ID Anda, lalu menyimpannya di `telegram-config.js`. Jika tidak, file akan tetap dibuat dengan status nonaktif.
 
--   **Cara Mendapatkan Cookie**:
-    1.  Buka AppleVille di browser Anda dan login.
-    2.  Tekan `F12` untuk membuka Developer Tools.
-    3.  Buka tab **Network** (Jaringan).
-    4.  Cari *request* apa pun ke API (misalnya, `getState` atau `harvest`).
-    5.  Di bagian **Headers**, cari *request header* bernama `cookie`.
-    6.  **Copy seluruh nilai** dari header `cookie` tersebut.
-
--   **Penggunaan**:
-    Saat Anda menjalankan bot untuk pertama kali, ia akan meminta Anda untuk mem-paste *cookie* tersebut. Setelah itu, *cookie* akan disimpan di `akun.txt` dan tidak akan diminta lagi.
-
----
+File `akun.txt` dan `telegram-config.js` akan **diabaikan oleh Git** secara otomatis, sehingga konfigurasi pribadi Anda aman.
 
 ## ▶️ Menjalankan Bot
 
 Pastikan Anda berada di direktori utama proyek di terminal Anda, lalu jalankan:
 
-```bash
+```
 node main.js
 ```
 
-Bot akan memandu Anda melalui beberapa pertanyaan konfigurasi awal (slot, bibit, booster) dan kemudian akan mulai beroperasi secara otomatis.
-
----
+Bot akan menampilkan status awal akun Anda, lalu memandu Anda melalui beberapa pertanyaan konfigurasi untuk sesi _farming_ saat ini.
 
 ## 🎛️ Konfigurasi
 
-Semua pengaturan utama dapat diubah langsung di dalam file `config.js`, termasuk:
--   `DEBUG_MODE`: Ubah menjadi `true` untuk melihat log *debug* yang detail.
--   Pengaturan default untuk bibit, booster, dan jumlah pembelian.
+- **Pengaturan Bot**: Semua pengaturan utama (bibit default, jumlah pembelian, dll.) dapat diubah di `config.js`.
 
----
-
-## 🧰 Troubleshooting
-
--   **Error `SyntaxError: Cannot use import statement outside a module`**: Pastikan Anda sudah menambahkan `"type": "module"` di dalam `package.json` (hanya untuk setup manual).
--   **Bot Gagal Terhubung / Error 401**: Kemungkinan besar *cookie* Anda sudah kedaluwarsa. Hapus file `akun.txt` dan jalankan ulang bot. Ia akan meminta Anda untuk memasukkan *cookie* yang baru.
--   **Bot Gagal Memasang Booster (Error 400)**: Pastikan Anda tidak menjalankan beberapa instance bot secara bersamaan, karena ini dapat menyebabkan konflik aksi.
-
----
+- **Notifikasi Telegram**: Anda bisa mengaktifkan/menonaktifkan notifikasi atau mengubah token/ID chat langsung di file `telegram-config.js`.
 
 ## ⚠️ Disclaimer
 
