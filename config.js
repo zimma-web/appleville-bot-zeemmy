@@ -51,10 +51,10 @@ export const SEEDS = {
     // Bibit dengan Prestige
     'legacy-apple': { name: 'Legacy Apple', price: 8, priceCurrency: 'apples', growSeconds: 60, prestige: 1, reward: 14, rewardCurrency: 'apples' },
     'ascendant-apple': { name: 'Ascendant Apple', price: 60, priceCurrency: 'apples', growSeconds: 300, prestige: 2, reward: 100, rewardCurrency: 'apples' },
-    'relic-apple': { name: 'Relic Apple', price: 120, priceCurrency: 'apples', growSeconds: 2700, prestige: 3 },
-    'ethereal-apple': { name: 'Ethereal Apple', price: 400, priceCurrency: 'apples', growSeconds: 7200, prestige: 4 },
-    'quantum-apple': { name: 'Quantum Apple', price: 1500, priceCurrency: 'apples', growSeconds: 28800, prestige: 5 },
-    'celestial-apple': { name: 'Celestial Apple', price: 2500, priceCurrency: 'apples', growSeconds: 36000, prestige: 6 },
+    'relic-apple': { name: 'Relic Apple', price: 120, priceCurrency: 'apples', growSeconds: 2700, prestige: 3, reward: 400, rewardCurrency: 'apples' },
+    'ethereal-apple': { name: 'Ethereal Apple', price: 400, priceCurrency: 'apples', growSeconds: 7200, prestige: 4, reward: 1300, rewardCurrency: 'apples' },
+    'quantum-apple': { name: 'Quantum Apple', price: 1500, priceCurrency: 'apples', growSeconds: 28800, prestige: 5, reward: 5000, rewardCurrency: 'apples' },
+    'celestial-apple': { name: 'Celestial Apple', price: 2500, priceCurrency: 'apples', growSeconds: 36000, prestige: 6, reward: 8500, rewardCurrency: 'apples' },
     'apex-apple': { name: 'Apex Apple', price: 3000, priceCurrency: 'apples', growSeconds: 43200, prestige: 7, reward: 11000, rewardCurrency: 'apples' },
 };
 
