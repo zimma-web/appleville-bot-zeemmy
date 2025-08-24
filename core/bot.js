@@ -30,7 +30,7 @@ export class Bot {
         this.statusInterval = null;
         this.isBuyingSeed = false;
         this.isBuyingBooster = false;
-        this.userIdentifier = 'Unknown Account'; // [BARU] Untuk menyimpan identitas akun
+        this.userIdentifier = 'Unknown Account';
     }
 
     /**
@@ -42,7 +42,6 @@ export class Bot {
 
         try {
             const { user, state } = await api.getState();
-            // [DIUBAH] Simpan identitas akun untuk notifikasi
             this.userIdentifier = user?.rewardWalletAddress || 'Unknown Account';
             await this.initializeSlots(state);
         } catch (error) {
@@ -80,7 +79,6 @@ export class Bot {
      */
     async initializeSlots(initialState) {
         logger.info('Inisialisasi slot...');
-        // Hapus timer lama sebelum memulai yang baru
         this.plantTimers.forEach(timer => clearTimeout(timer));
         this.boosterTimers.forEach(timer => clearTimeout(timer));
         this.plantTimers.clear();
@@ -143,7 +141,6 @@ export class Bot {
         logger.error('CAPTCHA DIBUTUHKAN. Bot dijeda.');
         logger.info('Silakan selesaikan CAPTCHA di browser. Bot akan mencoba lagi secara otomatis.');
 
-        // [DIUBAH] Sertakan identitas akun di pesan Telegram
         const message = `🚨 *CAPTCHA Dibutuhkan!* 🚨\n\nAkun: \`${this.userIdentifier}\`\n\nBot AppleVille dijeda. Mohon selesaikan CAPTCHA di browser.`;
         await sendTelegramMessage(message);
 
@@ -162,7 +159,6 @@ export class Bot {
             await api.getState();
             logger.success('CAPTCHA sepertinya sudah diselesaikan!');
 
-            // [DIUBAH] Sertakan identitas akun di pesan Telegram
             const message = `✅ *CAPTCHA Selesai!* ✅\n\nAkun: \`${this.userIdentifier}\`\n\nBot AppleVille akan melanjutkan operasi.`;
             await sendTelegramMessage(message);
 
@@ -237,6 +233,12 @@ export class Bot {
                 const newEndsAt = new Date(plantResult.data.plotResults[0].endsAt).getTime();
                 this.setHarvestTimer(slotIndex, newEndsAt);
                 logger.success(`Slot ${slotIndex} ditanami ${this.config.seedKey}.`);
+
+                // [DIPERBAIKI] Setelah berhasil menanam, selalu cek kebutuhan booster.
+                if (this.config.boosterKey) {
+                    await sleep(500); // Jeda singkat untuk konsistensi state
+                    await this.handleBoosterApplication(slotIndex);
+                }
             } else {
                 throw new Error(plantResult.error?.message || 'Unknown planting error');
             }
