@@ -47,7 +47,7 @@ async function fetchWithRetry(url, options, retries = API_SETTINGS.MAX_RETRIES) 
                 } catch { }
 
                 // Deteksi spesifik untuk error 421 (CAPTCHA)
-                if (response.status === 421) {
+                if (response.status === 412) {
                     throw new CaptchaError('Captcha required by server.');
                 }
 
