@@ -27,6 +27,8 @@ export const API_SETTINGS = {
     PAUSE_MS: 150, // jeda singkat antar panggilan API
 };
 
+
+
 /**
  * Data Bibit (Seeds)
  * Kunci objek (e.g., 'wheat') harus cocok dengan 'key' dari API.
@@ -49,11 +51,11 @@ export const SEEDS = {
     // Bibit dengan Prestige
     'legacy-apple': { name: 'Legacy Apple', price: 8, priceCurrency: 'apples', growSeconds: 60, prestige: 1, reward: 14, rewardCurrency: 'apples' },
     'ascendant-apple': { name: 'Ascendant Apple', price: 60, priceCurrency: 'apples', growSeconds: 300, prestige: 2, reward: 100, rewardCurrency: 'apples' },
-    'relic-apple': { name: 'Relic Apple', price: 120, priceCurrency: 'apples', growSeconds: 2700, reward: 400, prestige: 3 },
-    'ethereal-apple': { name: 'Ethereal Apple', price: 400, priceCurrency: 'apples', growSeconds: 7200, reward: 1300, prestige: 4 },
-    'quantum-apple': { name: 'Quantum Apple', price: 1500, priceCurrency: 'apples', growSeconds: 28800, reward: 5000, prestige: 5 },
-    'celestial-apple': { name: 'Celestial Apple', price: 2500, priceCurrency: 'apples', growSeconds: 36000, reward: 8500, prestige: 6 },
-    'apex-apple': { name: 'Apex Apple', price: 3000, priceCurrency: 'apples', growSeconds: 43200, reward: 11000, prestige: 7 },
+    'relic-apple': { name: 'Relic Apple', price: 120, priceCurrency: 'apples', growSeconds: 2700, prestige: 3 },
+    'ethereal-apple': { name: 'Ethereal Apple', price: 400, priceCurrency: 'apples', growSeconds: 7200, prestige: 4 },
+    'quantum-apple': { name: 'Quantum Apple', price: 1500, priceCurrency: 'apples', growSeconds: 28800, prestige: 5 },
+    'celestial-apple': { name: 'Celestial Apple', price: 2500, priceCurrency: 'apples', growSeconds: 36000, prestige: 6 },
+    'apex-apple': { name: 'Apex Apple', price: 3000, priceCurrency: 'apples', growSeconds: 43200, prestige: 7, reward: 11000, rewardCurrency: 'apples' },
 };
 
 /**
@@ -62,19 +64,19 @@ export const SEEDS = {
  */
 export const BOOSTERS = {
     // Booster Tanpa Prestige
-    'fertiliser': { name: 'Fertiliser', price: 18, priceCurrency: 'coins', effect: '+43% growth speed, for 12hr' },
+    'fertiliser': { name: 'Fertiliser', price: 10, priceCurrency: 'coins', effect: '+43% growth speed, for 12hr' },
     'silver-tonic': { name: 'Silver Tonic', price: 15, priceCurrency: 'coins', effect: '+25% yield, for 12hr' },
     'super-fertiliser': { name: 'Super Fertiliser', price: 25, priceCurrency: 'apples', effect: '+100% growth speed, for 12hr' },
     'golden-tonic': { name: 'Golden Tonic', price: 50, priceCurrency: 'apples', effect: '+100% yield, for 12hr' },
     'deadly-mix': { name: 'Deadly Mix', price: 150, priceCurrency: 'apples', effect: '-40% yield, +700% growth speed, for 12hr' },
     'quantum-fertilizer': { name: 'Quantum Fertilizer', price: 175, priceCurrency: 'apples', effect: '+50% yield, +150% growth speed, for 12hr' },
+    'potion-of-gains': { name: 'Potion of Gains', price: 15, priceCurrency: 'apples', effect: '+67% growth speed, for 12hr' },
 
     // Booster dengan Prestige
-    'potion-of-gains': { name: 'Potion of Gains', price: 15, priceCurrency: 'apples', effect: '+67% growth speed, for 12hr', prestige: 1 },
     'elixir-of-degens': { name: 'Elixir of Degens', price: 30, priceCurrency: 'apples', effect: '+75% yield, for 12hr', prestige: 2 },
-    'giga-brew': { name: 'Giga Brew', price: 75, priceCurrency: 'apples', effect: '+40% yield, +6...', prestige: 3 },
-    'hild-growth': { name: 'Hild Growth', price: 180, priceCurrency: 'apples', effect: '+200% yield...', prestige: 4 },
-    'warp-time-elixir': { name: 'Warp-Time Elixir', price: 500, priceCurrency: 'apples', effect: '+400% growth...', prestige: 5 },
-    'titans-growth': { name: 'Titan\'s Growth', price: 1000, priceCurrency: 'apples', effect: '+400% yield...', prestige: 6 },
-    'apex-potion': { name: 'Apex Potion', price: 5000, priceCurrency: 'apples', effect: '+100% yield, +2...', prestige: 7 },
+    'giga-brew': { name: 'Giga Brew', price: 75, priceCurrency: 'apples', effect: '+40% yield, +67% growth speed, for 12hr', prestige: 3 },
+    'wild-growth': { name: 'Wild Growth', price: 100, priceCurrency: 'apples', effect: '+200% yield, -20% growth speed, for 12hr', prestige: 4 },
+    'warp-time-elixir': { name: 'Warp-Time Elixir', price: 500, priceCurrency: 'apples', effect: '+400% growth speed, for 12hr', prestige: 5 },
+    'titans-growth': { name: 'Titan\'s Growth', price: 1000, priceCurrency: 'apples', effect: '+400% yield, -33% growth speed, for 24hr', prestige: 6 },
+    'apex-potion': { name: 'Apex Potion', price: 5000, priceCurrency: 'apples', effect: '+100% yield, +233% growth speed, for 12hr', prestige: 7 },
 };

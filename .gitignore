@@ -1,2 +1,12 @@
-.env
+# File konfigurasi pribadi (JANGAN DI-COMMIT)
 akun.txt
+telegram-config.js
+.env
+# Dependensi Node.js
+node_modules/
+
+# File log dan cache
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.DS_Store

@@ -22,7 +22,7 @@ const askQuestion = (question) => {
     });
 };
 
-// [BARU] Helper function untuk format waktu
+// [DIUBAH] Helper function untuk format waktu
 const formatSeconds = (s) => {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
@@ -64,6 +64,62 @@ async function ensureCookieInteractive() {
     return cookieInput;
 }
 
+// [LOGIKA BARU] Setup interaktif untuk konfigurasi Telegram
+async function ensureTelegramConfigInteractive() {
+    const configFile = path.join(process.cwd(), 'telegram-config.js');
+    if (fs.existsSync(configFile)) {
+        logger.debug('File telegram-config.js sudah ada.');
+        return;
+    }
+
+    logger.info('\n--- Setup Notifikasi Telegram ---');
+    const setupAnswer = await askQuestion('Apakah Anda ingin mengatur notifikasi Telegram sekarang? (y/n) [default: n]: ');
+
+    if (setupAnswer.toLowerCase() !== 'y') {
+        const content = `
+// Konfigurasi Telegram dinonaktifkan.
+// Isi detail di bawah dan ubah ENABLED menjadi true untuk mengaktifkan.
+export const TELEGRAM_SETTINGS = {
+  ENABLED: false,
+  BOT_TOKEN: 'ISI_DENGAN_TOKEN_BOT_ANDA',
+  CHAT_ID: 'ISI_DENGAN_CHAT_ID_ANDA',
+  CAPTCHA_RETRY_INTERVAL: 120000,
+};`;
+        fs.writeFileSync(configFile, content.trim(), 'utf8');
+        logger.info('Setup Telegram dilewati. File telegram-config.js telah dibuat dengan status nonaktif.');
+        return;
+    }
+
+    const botToken = await askQuestion('Masukkan Token Bot Telegram Anda: ');
+    const chatId = await askQuestion('Masukkan Chat ID Anda: ');
+
+    if (!botToken || !chatId) {
+        const content = `
+// Konfigurasi Telegram dinonaktifkan karena data tidak lengkap.
+export const TELEGRAM_SETTINGS = {
+  ENABLED: false,
+  BOT_TOKEN: 'ISI_DENGAN_TOKEN_BOT_ANDA',
+  CHAT_ID: 'ISI_DENGAN_CHAT_ID_ANDA',
+  CAPTCHA_RETRY_INTERVAL: 120000,
+};`;
+        fs.writeFileSync(configFile, content.trim(), 'utf8');
+        logger.warn('Token atau Chat ID kosong. File telegram-config.js dibuat dengan status nonaktif.');
+        return;
+    }
+
+    const content = `
+// Konfigurasi Notifikasi Telegram
+export const TELEGRAM_SETTINGS = {
+  ENABLED: true,
+  BOT_TOKEN: '${botToken}',
+  CHAT_ID: '${chatId}',
+  CAPTCHA_RETRY_INTERVAL: 120000, // 2 menit
+};`;
+    fs.writeFileSync(configFile, content.trim(), 'utf8');
+    logger.success('Konfigurasi Telegram berhasil disimpan di telegram-config.js');
+}
+
+
 // --- FUNGSI UTAMA ---
 
 async function start() {
@@ -71,8 +127,11 @@ async function start() {
         const cookie = await ensureCookieInteractive();
         setCookie(cookie);
 
+        // [DIUBAH] Jalankan setup interaktif untuk Telegram
+        await ensureTelegramConfigInteractive();
+
         // Verifikasi koneksi dan cookie
-        logger.info('Memverifikasi koneksi dan cookie...');
+        logger.info('\nMemverifikasi koneksi dan cookie...');
         const initialState = await api.getState();
         if (!initialState.ok) {
             logger.error('Gagal terhubung. Periksa kembali cookie Anda atau koneksi internet.');
@@ -87,11 +146,11 @@ async function start() {
 
 
         // Kumpulkan konfigurasi dari pengguna
-        const slotsAns = await askQuestion(`\nMasukkan slot (mis: 1,2,3) [default: 1,2,3,4,5,6,7,8,9,10,11,12]: `);
+        const slotsAns = await askQuestion(`\nMasukkan slot (mis: 1,2,3) [default: semua]: `);
         let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : DEFAULT_SETTINGS.SLOTS;
         if (!slots.length) slots = DEFAULT_SETTINGS.SLOTS;
 
-        // [DIUBAH] Menampilkan daftar bibit dengan informasi lengkap
+        // Menampilkan daftar bibit dengan informasi lengkap
         console.log('\n--- Bibit Tersedia ---');
         Object.entries(SEEDS).forEach(([key, seedData]) => {
             const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
@@ -105,7 +164,7 @@ async function start() {
             process.exit(1);
         }
 
-        // [DIUBAH] Menampilkan daftar booster dengan informasi lengkap
+        // Menampilkan daftar booster dengan informasi lengkap
         console.log('\n--- Booster Tersedia ---');
         Object.entries(BOOSTERS).forEach(([key, boosterData]) => {
             const prestigeInfo = boosterData.prestige ? ` (Prestige: ${boosterData.prestige})` : '';
