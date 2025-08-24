@@ -9,7 +9,7 @@
  */
 export const DEFAULT_SETTINGS = {
     SLOTS: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    SEED: 'royal-apple',
+    SEED: 'ascendant-apple',
     BUY_QTY_SEED: 12,
     BOOSTER: 'quantum-fertilizer',
     BUY_QTY_BOOSTER: 12,
@@ -79,4 +79,18 @@ export const BOOSTERS = {
     'warp-time-elixir': { name: 'Warp-Time Elixir', price: 500, priceCurrency: 'apples', effect: '+400% growth speed, for 12hr', prestige: 5 },
     'titans-growth': { name: 'Titan\'s Growth', price: 1000, priceCurrency: 'apples', effect: '+400% yield, -33% growth speed, for 24hr', prestige: 6 },
     'apex-potion': { name: 'Apex Potion', price: 5000, priceCurrency: 'apples', effect: '+100% yield, +233% growth speed, for 12hr', prestige: 7 },
+};
+
+/**
+ * [BARU] Data Level Prestige
+ * Berisi informasi multiplier keuntungan AP dan biaya upgrade.
+ */
+export const PRESTIGE_LEVELS = {
+    1: { multiplier: 1.2, apRequired: 60000 },
+    2: { multiplier: 1.4, apRequired: 150000 },
+    3: { multiplier: 1.5, apRequired: 300000 },
+    4: { multiplier: 1.6, apRequired: 500000 },
+    5: { multiplier: 1.8, apRequired: 750000 },
+    6: { multiplier: 1.9, apRequired: 900000 },
+    7: { multiplier: 2.0, apRequired: 1000000 },
 };

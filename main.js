@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from './utils/logger.js';
 import { setCookie, api } from './services/api.js';
-import { DEFAULT_SETTINGS, SEEDS, BOOSTERS } from './config.js';
+import { DEFAULT_SETTINGS, SEEDS, BOOSTERS, PRESTIGE_LEVELS } from './config.js';
 import { Bot } from './core/bot.js';
 
 // --- FUNGSI INTERAKSI PENGGUNA ---
@@ -22,7 +22,7 @@ const askQuestion = (question) => {
     });
 };
 
-// [DIUBAH] Helper function untuk format waktu
+// Helper function untuk format waktu
 const formatSeconds = (s) => {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
@@ -64,7 +64,7 @@ async function ensureCookieInteractive() {
     return cookieInput;
 }
 
-// [LOGIKA BARU] Setup interaktif untuk konfigurasi Telegram
+// Setup interaktif untuk konfigurasi Telegram
 async function ensureTelegramConfigInteractive() {
     const configFile = path.join(process.cwd(), 'telegram-config.js');
     if (fs.existsSync(configFile)) {
@@ -127,7 +127,6 @@ async function start() {
         const cookie = await ensureCookieInteractive();
         setCookie(cookie);
 
-        // [DIUBAH] Jalankan setup interaktif untuk Telegram
         await ensureTelegramConfigInteractive();
 
         // Verifikasi koneksi dan cookie
@@ -138,39 +137,61 @@ async function start() {
             process.exit(1);
         }
 
-        // Menampilkan data yang lebih lengkap dan akurat
+        // Semua info status ditampilkan di awal
         const user = initialState.user;
+        const userPrestigeLevel = user?.prestigeLevel || 0;
         logger.success(`Terhubung sebagai: ${user?.rewardWalletAddress || 'Unknown'}`);
         logger.info(`💰 Saldo: ${user?.coins || 0} koin | ${user?.ap || 0} AP (apel)`);
-        logger.info(`✨ XP: ${user?.xp || 0} | Level Prestige: ${user?.prestigeLevel || 0}`);
+        logger.info(`✨ XP: ${user?.xp || 0} | Level Prestige: ${userPrestigeLevel}`);
+
+        const nextPrestigeLevel = userPrestigeLevel + 1;
+        if (PRESTIGE_LEVELS[nextPrestigeLevel]) {
+            const requiredAP = PRESTIGE_LEVELS[nextPrestigeLevel].apRequired;
+            logger.info(`🎯 Next Prestige (${nextPrestigeLevel}): ${requiredAP.toLocaleString('id-ID')} AP dibutuhkan`);
+        }
+
+        logger.info('--- Status Slot Awal ---');
+        const slotMap = new Map(initialState.state.plots.map(p => [p.slotIndex, p]));
+        const allSlots = initialState.state.plots.map(p => p.slotIndex).sort((a, b) => a - b);
+        for (const slotIndex of allSlots) {
+            const slot = slotMap.get(slotIndex);
+            const plantInfo = slot?.seed ? `🌱 ${slot.seed.key}` : 'Kosong';
+            const boosterInfo = slot?.modifier ? `⚡ ${slot.modifier.key}` : 'Tanpa Booster';
+            logger.info(`Slot ${String(slotIndex).padEnd(2, ' ')}: ${plantInfo.padEnd(25, ' ')} | ${boosterInfo}`);
+        }
+        logger.info('------------------------');
 
 
         // Kumpulkan konfigurasi dari pengguna
-        const slotsAns = await askQuestion(`\nMasukkan slot (mis: 1,2,3) [default: semua]: `);
-        let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : DEFAULT_SETTINGS.SLOTS;
-        if (!slots.length) slots = DEFAULT_SETTINGS.SLOTS;
+        const slotsAns = await askQuestion(`\nMasukkan slot yang ingin dijalankan (mis: 1,2,3) [default: semua 12 slot]: `);
+        let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : allSlots;
+        if (!slots.length) slots = allSlots;
 
-        // Menampilkan daftar bibit dengan informasi lengkap
+        // [DIUBAH] Menampilkan daftar bibit yang sesuai dengan level prestige
         console.log('\n--- Bibit Tersedia ---');
-        Object.entries(SEEDS).forEach(([key, seedData]) => {
-            const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
-            const prestigeInfo = seedData.prestige ? ` (Prestige: ${seedData.prestige})` : '';
-            const rewardInfo = seedData.reward ? ` | Reward: ${seedData.rewardCurrency === 'coins' ? '🪙' : '🍎'} ${seedData.reward}` : '';
-            console.log(`- ${key.padEnd(18, ' ')} ${growTime.padEnd(10, ' ')}${rewardInfo}${prestigeInfo}`);
-        });
+        Object.entries(SEEDS)
+            .filter(([key, seedData]) => !seedData.prestige || seedData.prestige <= userPrestigeLevel)
+            .forEach(([key, seedData]) => {
+                const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
+                const prestigeInfo = seedData.prestige ? ` (Prestige: ${seedData.prestige})` : '';
+                const rewardInfo = seedData.reward ? `| Reward: ${seedData.rewardCurrency === 'coins' ? '🪙' : '🍎'} ${seedData.reward}` : '';
+                console.log(`- ${key.padEnd(18, ' ')} ${growTime.padEnd(10, ' ')} ${rewardInfo} ${prestigeInfo}`);
+            });
         const seedKey = (await askQuestion(`\nPilih bibit [default: ${DEFAULT_SETTINGS.SEED}]: `) || DEFAULT_SETTINGS.SEED).toLowerCase();
         if (!SEEDS[seedKey]) {
             logger.error(`Bibit '${seedKey}' tidak dikenal.`);
             process.exit(1);
         }
 
-        // Menampilkan daftar booster dengan informasi lengkap
+        // [DIUBAH] Menampilkan daftar booster yang sesuai dengan level prestige
         console.log('\n--- Booster Tersedia ---');
-        Object.entries(BOOSTERS).forEach(([key, boosterData]) => {
-            const prestigeInfo = boosterData.prestige ? ` (Prestige: ${boosterData.prestige})` : '';
-            const effectInfo = boosterData.effect ? ` | ${boosterData.effect}` : '';
-            console.log(`- ${key.padEnd(20, ' ')}${effectInfo}${prestigeInfo}`);
-        });
+        Object.entries(BOOSTERS)
+            .filter(([key, boosterData]) => !boosterData.prestige || boosterData.prestige <= userPrestigeLevel)
+            .forEach(([key, boosterData]) => {
+                const prestigeInfo = boosterData.prestige ? `(Prestige: ${boosterData.prestige})` : '';
+                const effectInfo = boosterData.effect ? `| ${boosterData.effect}` : '';
+                console.log(`- ${key.padEnd(20, ' ')} ${effectInfo} ${prestigeInfo}`);
+            });
         console.log(`- none`);
         const boosterKey = (await askQuestion(`\nPilih booster (ketik 'none' untuk tanpa booster) [default: ${DEFAULT_SETTINGS.BOOSTER}]: `) || DEFAULT_SETTINGS.BOOSTER).toLowerCase();
         if (boosterKey !== 'none' && !BOOSTERS[boosterKey]) {
@@ -197,8 +218,6 @@ async function start() {
             seedBuyQty, // Menggunakan nilai dari input pengguna
             boosterBuyQty, // Menggunakan nilai dari input pengguna
         };
-
-        logger.info('Konfigurasi bot selesai. Memulai...');
 
         // Membuat instance bot dan memulainya
         const bot = new Bot(config);
