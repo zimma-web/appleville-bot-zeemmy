@@ -43,3 +43,15 @@ export const applyModifierPayload = (slotIndex, modifierKey) => ({
 export const buyItemPayload = (key, quantity) => ({
     0: { json: { purchases: [{ key, quantity }] } }
 });
+
+
+
+// --- [BARU] AKSI MASSAL (BATCH) ---
+
+export const plantMultiplePayload = (plantings) => ({
+    0: { json: { plantings } }
+});
+
+export const harvestMultiplePayload = (slotIndexes) => ({
+    0: { json: { slotIndexes } }
+});

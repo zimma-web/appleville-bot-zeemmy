@@ -163,7 +163,7 @@ async function start() {
 
 
         // Kumpulkan konfigurasi dari pengguna
-        const slotsAns = await askQuestion(`\nMasukkan slot yang ingin dijalankan (mis: 1,2,3) [default: semua 12 slot]: `);
+        const slotsAns = await askQuestion(`\nMasukkan slot yang ingin dijalankan (mis: 1,2,3) [default: semua (${allSlots.length} slot)]: `);
         let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : allSlots;
         if (!slots.length) slots = allSlots;
 

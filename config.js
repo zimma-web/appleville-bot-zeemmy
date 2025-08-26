@@ -11,10 +11,10 @@ export const DEFAULT_SETTINGS = {
     SLOTS: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     SEED: 'ascendant-apple',
     BUY_QTY_SEED: 12,
-    BOOSTER: 'quantum-fertilizer',
+    BOOSTER: 'warp-time-elixir',
     BUY_QTY_BOOSTER: 12,
     AUTO_REFRESH_BOOSTER: true,
-    DEBUG_MODE: false, // Ubah ke true untuk mengaktifkan debug.
+    DEBUG_MODE: true, // Ubah ke true untuk mengaktifkan debug.
 };
 
 /**
@@ -27,7 +27,14 @@ export const API_SETTINGS = {
     PAUSE_MS: 150, // jeda singkat antar panggilan API
 };
 
-
+/**
+ * [BARU] Pengaturan untuk Batch Processing
+ * Bibit yang ada di daftar ini akan dipanen & ditanam secara massal.
+ */
+export const BATCH_SETTINGS = {
+    ENABLED_SEEDS: ['wheat', 'lettuce'], // Tambahkan bibit cepat lainnya di sini
+    INTERVAL: 5000, // Cek setiap 5 detik
+};
 
 /**
  * Data Bibit (Seeds)

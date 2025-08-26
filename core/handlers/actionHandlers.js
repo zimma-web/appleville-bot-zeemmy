@@ -13,30 +13,27 @@ function inventoryCount(state, key) {
     return item?.quantity || 0;
 }
 
-// [LOGIKA BARU] Fungsi terpusat yang sepenuhnya anti-race condition
-async function purchaseItemIfNeeded(bot, itemType) {
+// Fungsi terpusat yang sepenuhnya anti-race condition
+async function purchaseItemIfNeeded(bot, itemType, quantityNeeded = 1) {
     const isSeed = itemType === 'seed';
     const lock = isSeed ? 'isBuyingSeed' : 'isBuyingBooster';
     const key = isSeed ? bot.config.seedKey : bot.config.boosterKey;
-    const buyQty = isSeed ? bot.config.seedBuyQty : bot.config.boosterBuyQty;
+    const buyQty = isSeed ? Math.max(bot.config.seedBuyQty, quantityNeeded) : Math.max(bot.config.boosterBuyQty, quantityNeeded);
 
-    // Jika proses lain sedang membeli, tunggu dengan sabar.
     if (bot[lock]) {
         logger.debug(`Pembelian ${itemType} sudah berjalan, proses ini menunggu...`);
         while (bot[lock]) {
             await sleep(500);
         }
-        return; // Setelah menunggu, stok seharusnya sudah ada.
+        return;
     }
 
     try {
-        // Ambil kunci terlebih dahulu untuk mencegah proses lain masuk.
         bot[lock] = true;
 
-        // Setelah mendapatkan kunci, periksa apakah pembelian masih diperlukan.
         const { state } = await api.getState();
-        if (inventoryCount(state, key) < 1) {
-            logger.warn(`${isSeed ? 'Bibit' : 'Booster'} ${key} habis. Membeli ${buyQty}...`);
+        if (inventoryCount(state, key) < quantityNeeded) {
+            logger.warn(`${isSeed ? 'Bibit' : 'Booster'} ${key} habis/kurang. Membeli ${buyQty}...`);
             const buyResult = await api.buyItem(key, buyQty);
             if (!buyResult.ok) {
                 throw new Error(`Gagal membeli ${itemType}.`);
@@ -46,8 +43,67 @@ async function purchaseItemIfNeeded(bot, itemType) {
             logger.debug(`Stok ${itemType} sudah ada, pembelian dibatalkan.`);
         }
     } finally {
-        // Apapun yang terjadi, selalu lepaskan kunci.
         bot[lock] = false;
+    }
+}
+
+// [FUNGSI BARU] Untuk menangani siklus panen dan tanam massal
+export async function handleBatchCycle(bot, initialEmptySlots = [], isInitialization = false) {
+    if (!bot.isRunning || bot.isPausedForCaptcha) return;
+
+    try {
+        let slotsToProcess = initialEmptySlots;
+
+        if (!isInitialization) {
+            const { state } = await api.getState();
+            const now = Date.now();
+            slotsToProcess = bot.config.slots.filter(slotIndex => {
+                const plot = state.plots.find(p => p.slotIndex === slotIndex);
+                return !plot?.seed || (plot.seed.endsAt && new Date(plot.seed.endsAt).getTime() <= now);
+            });
+        }
+
+        if (slotsToProcess.length === 0) return;
+
+        logger.info(`Mode Batch: ${slotsToProcess.length} slot siap diproses.`);
+
+        // 1. Panen semua yang siap (kecuali saat inisialisasi)
+        if (!isInitialization) {
+            const readyToHarvest = slotsToProcess.filter(async slotIndex => {
+                const { state } = await api.getState(); // Get latest state
+                return state.plots.some(p => p.slotIndex === slotIndex && p.seed);
+            });
+
+            if (readyToHarvest.length > 0) {
+                logger.action('harvest', `Memanen ${readyToHarvest.length} slot secara massal...`);
+                const harvestResult = await api.harvestMultiple(readyToHarvest);
+                if (harvestResult.ok) {
+                    const totalCoins = harvestResult.data.plotResults.reduce((sum, p) => sum + (p.coinsEarned || 0), 0);
+                    const totalAp = harvestResult.data.plotResults.reduce((sum, p) => sum + (p.apEarned || 0), 0);
+                    logger.success(`Panen massal berhasil: +${Math.round(totalCoins)} koin, +${Math.round(totalAp)} AP.`);
+                } else {
+                    logger.error('Gagal melakukan panen massal.');
+                }
+                await sleep(500);
+            }
+        }
+
+        // 2. Tanam di semua slot yang sekarang kosong
+        await purchaseItemIfNeeded(bot, 'seed', slotsToProcess.length);
+
+        logger.action('plant', `Menanam di ${slotsToProcess.length} slot secara massal...`);
+        const plantings = slotsToProcess.map(slotIndex => ({ slotIndex, seedKey: bot.config.seedKey }));
+        const plantResult = await api.plantMultiple(plantings);
+
+        if (plantResult.ok) {
+            logger.success(`Berhasil menanam di ${plantResult.data.plantedSeeds || 0} slot.`);
+        } else {
+            logger.error('Gagal melakukan penanaman massal.');
+        }
+
+    } catch (error) {
+        if (error instanceof CaptchaError) return bot.handleCaptchaRequired();
+        logger.error(`Terjadi error pada siklus batch: ${error.message}`);
     }
 }
 
@@ -90,7 +146,6 @@ export async function handlePlanting(bot, slotIndex, retryCount = 0) {
     if (!bot.isRunning || bot.isPausedForCaptcha) return;
 
     try {
-        // [DIUBAH] Selalu pastikan stok ada sebelum menanam
         await purchaseItemIfNeeded(bot, 'seed');
 
         logger.action('plant', `Menanam di slot ${slotIndex}...`);
@@ -105,7 +160,6 @@ export async function handlePlanting(bot, slotIndex, retryCount = 0) {
                 await handleBoosterApplication(bot, slotIndex);
             }
         } else {
-            // Jika gagal karena race condition (slot lain memakai bibit terakhir), coba lagi.
             if (plantResult.error?.message?.includes('Not enough')) {
                 logger.warn(`Slot ${slotIndex} gagal tanam karena bibit habis (race condition). Mencoba lagi segera.`);
                 setTimeout(() => handlePlanting(bot, slotIndex, 0), 500);
@@ -137,7 +191,6 @@ export async function handleBoosterApplication(bot, slotIndex, retryCount = 0) {
             return;
         }
 
-        // [DIUBAH] Selalu pastikan stok ada sebelum memasang
         await purchaseItemIfNeeded(bot, 'booster');
 
         logger.action('boost', `Memasang booster di slot ${slotIndex}...`);

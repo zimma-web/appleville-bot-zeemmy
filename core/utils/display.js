@@ -4,12 +4,25 @@
 // =================================================================
 
 import { updateLine } from '../../utils/logger.js';
+import { BATCH_SETTINGS } from '../../config.js';
 
 export function displayStatus(bot) {
     if (bot.isPausedForCaptcha) {
         updateLine(`⏸️ Bot dijeda untuk akun ${bot.userIdentifier}. Menunggu CAPTCHA diselesaikan...`);
         return;
     }
+
+    // [LOGIKA BARU] Cek apakah bot sedang dalam mode batch
+    const isBatchMode = BATCH_SETTINGS.ENABLED_SEEDS.includes(bot.config.seedKey);
+
+    if (isBatchMode) {
+        // Jika mode batch, tampilkan jumlah total slot yang dikonfigurasi
+        const farmingCount = bot.config.slots.length;
+        updateLine(`🌱 Farming ${farmingCount} slots (Mode Batch)...`);
+        return;
+    }
+
+    // Logika lama untuk mode individual timer
     const now = Date.now();
     let nextHarvestSlot = null;
     let minDuration = Infinity;

@@ -4,7 +4,7 @@
 // =================================================================
 
 import { logger } from '../../utils/logger.js';
-import { api, CaptchaError } from '../../services/api.js';
+import { api, CaptchaError, SignatureError } from '../../services/api.js';
 import { PRESTIGE_LEVELS } from '../../config.js';
 import { sendTelegramMessage } from '../../utils/telegram.js';
 
@@ -13,6 +13,16 @@ try {
     const config = await import('../../telegram-config.js');
     TELEGRAM_SETTINGS = config.TELEGRAM_SETTINGS;
 } catch (error) { }
+
+// [FUNGSI BARU] Menangani error signature yang fatal
+export async function handleSignatureError(bot, error) {
+    logger.error('FATAL: Terjadi masalah dengan signature request.');
+    logger.error(error.message);
+    const message = `🔥 *Error Signature Kritis!* 🔥\n\nAkun: \`${bot.userIdentifier}\`\n\nBot dihentikan karena signature tidak valid. Ini memerlukan perbaikan pada kode.\n\n*Pesan Error:* \`${error.message}\``;
+    await sendTelegramMessage(message);
+    bot.stop();
+}
+
 
 export async function handleCaptchaRequired(bot) {
     if (bot.isPausedForCaptcha) return;
