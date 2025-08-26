@@ -21,7 +21,7 @@ export class Bot {
         this.captchaCheckInterval = null;
         this.statusInterval = null;
         this.prestigeCheckInterval = null;
-        this.batchCycleInterval = null; // [BARU] Timer untuk batch processing
+        this.batchCycleInterval = null;
         this.notifiedPrestigeLevel = 0;
         this.isBuyingSeed = false;
         this.isBuyingBooster = false;
@@ -37,10 +37,11 @@ export class Bot {
             this.userIdentifier = user?.rewardWalletAddress || 'Unknown Account';
             this.notifiedPrestigeLevel = user?.prestigeLevel || 0;
 
-            // [LOGIKA BARU] Memilih mode operasi berdasarkan bibit
             if (BATCH_SETTINGS.ENABLED_SEEDS.includes(this.config.seedKey)) {
                 logger.info(`Bibit '${this.config.seedKey}' terdeteksi sebagai bibit cepat. Menggunakan mode Batch Processing.`);
                 await this.initializeBatchMode(state);
+                // Jalankan siklus pertama segera, lalu atur interval
+                this.runBatchCycle();
                 this.batchCycleInterval = setInterval(() => this.runBatchCycle(), BATCH_SETTINGS.INTERVAL);
             } else {
                 logger.info(`Menggunakan mode Individual Timer untuk bibit '${this.config.seedKey}'.`);
@@ -71,13 +72,12 @@ export class Bot {
         clearInterval(this.statusInterval);
         clearInterval(this.captchaCheckInterval);
         clearInterval(this.prestigeCheckInterval);
-        clearInterval(this.batchCycleInterval); // Hentikan timer batch
+        clearInterval(this.batchCycleInterval);
 
         logger.success('Bot berhenti dengan aman.');
         process.exit(0);
     }
 
-    // [DIUBAH] Nama fungsi diganti menjadi initializeIndividualMode
     async initializeIndividualMode(initialState) {
         logger.info('Inisialisasi slot (Mode Individual)...');
         this.clearAllTimers();
@@ -92,16 +92,23 @@ export class Bot {
         }
     }
 
-    // [FUNGSI BARU] Inisialisasi untuk mode batch
+    // [LOGIKA BARU] Inisialisasi yang lebih cerdas dan sederhana untuk mode batch
     async initializeBatchMode(initialState) {
         logger.info('Inisialisasi slot (Mode Batch)...');
         this.clearAllTimers();
-        const slotMap = new Map(initialState.plots.map(p => [p.slotIndex, p]));
-        const emptySlots = this.config.slots.filter(s => !slotMap.get(s)?.seed);
-        if (emptySlots.length > 0) {
-            logger.info(`Menanam di ${emptySlots.length} slot kosong...`);
-            await handleBatchCycle(this, emptySlots, true); // Jalankan sekali untuk menanam yang kosong
+
+        // Hanya sinkronkan booster di awal. Siklus batch akan menangani sisanya.
+        if (this.config.boosterKey) {
+            logger.info('Menyinkronkan status booster awal...');
+            const slotMap = new Map(initialState.plots.map(p => [p.slotIndex, p]));
+            for (const slotIndex of this.config.slots) {
+                const slot = slotMap.get(slotIndex);
+                if (slot?.seed && !slot.modifier) {
+                    await this.handleBoosterApplication(slotIndex);
+                }
+            }
         }
+        logger.info('Inisialisasi selesai. Memulai siklus batch...');
     }
 
     clearAllTimers() {

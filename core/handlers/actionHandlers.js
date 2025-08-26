@@ -47,7 +47,7 @@ async function purchaseItemIfNeeded(bot, itemType, quantityNeeded = 1) {
     }
 }
 
-// [FUNGSI BARU] Untuk menangani siklus panen dan tanam massal
+// Untuk menangani siklus panen dan tanam massal
 export async function handleBatchCycle(bot, initialEmptySlots = [], isInitialization = false) {
     if (!bot.isRunning || bot.isPausedForCaptcha) return;
 
@@ -69,10 +69,10 @@ export async function handleBatchCycle(bot, initialEmptySlots = [], isInitializa
 
         // 1. Panen semua yang siap (kecuali saat inisialisasi)
         if (!isInitialization) {
-            const readyToHarvest = slotsToProcess.filter(async slotIndex => {
-                const { state } = await api.getState(); // Get latest state
-                return state.plots.some(p => p.slotIndex === slotIndex && p.seed);
-            });
+            const { state } = await api.getState();
+            const readyToHarvest = slotsToProcess.filter(slotIndex =>
+                state.plots.some(p => p.slotIndex === slotIndex && p.seed)
+            );
 
             if (readyToHarvest.length > 0) {
                 logger.action('harvest', `Memanen ${readyToHarvest.length} slot secara massal...`);
@@ -97,6 +97,13 @@ export async function handleBatchCycle(bot, initialEmptySlots = [], isInitializa
 
         if (plantResult.ok) {
             logger.success(`Berhasil menanam di ${plantResult.data.plantedSeeds || 0} slot.`);
+            // [LOGIKA BARU] Setelah tanam massal, pasang booster satu per satu.
+            if (bot.config.boosterKey) {
+                logger.info(`Memeriksa kebutuhan booster untuk ${slotsToProcess.length} slot...`);
+                for (const slotIndex of slotsToProcess) {
+                    await handleBoosterApplication(bot, slotIndex);
+                }
+            }
         } else {
             logger.error('Gagal melakukan penanaman massal.');
         }
