@@ -1,36 +1,27 @@
 // =================================================================
-// DEBUG SIGNATURE UTILITY
-// Tambahan logging untuk debug masalah header
+// SIGNATURE UTILITY
+// File ini menggunakan konfigurasi dari signature-config.js
+// Hanya perlu di-update jika ada perubahan algoritma, bukan konfigurasi.
 // =================================================================
 
 import { webcrypto } from 'crypto';
-import { logger } from './logger.js'; // [DIUBAH] Impor logger
+import { logger } from './logger.js';
+import { SIGNATURE_PATTERN, KEY_PARTS, HEADER_NAMES } from './signature-config.js';
 
 /**
- * Secret key pattern dari source code asli (UPDATED)
+ * Secret key pattern dari source code asli
  */
 function getSecretKey() {
-    const keyParts = ["bbsds!eda", "2", "3ed2@#@!@#Ffdf#@!", "4"];
-    const pattern = [2, 1, 0, 2, 1, 2]; // dari source: let d = [2, 1, 0, 2, 1, 2]
-    const secretKey = pattern.map(index => keyParts[index]).join("");
-    logger.debug(`Secret key generated: ${secretKey}`); // [DIUBAH] Menggunakan logger.debug
+    const secretKey = SIGNATURE_PATTERN.map(index => KEY_PARTS[index]).join("");
+    logger.debug(`Secret key generated: ${secretKey}`);
     return secretKey;
 }
-
-/**
- * Header constants yang sesuai dengan source (UPDATED)
- */
-const HEADER_NAMES = {
-    META_HASH: "x-xcsa3d",
-    CLIENT_TIME: "x-dbsv",
-    TRACE_ID: "x-dsa"
-};
 
 /**
  * Membuat HMAC signature menggunakan Web Crypto API (sama seperti source)
  */
 async function createHmacSignature(secretKey, message) {
-    logger.debug(`Creating signature for message: ${message}`); // [DIUBAH] Menggunakan logger.debug
+    logger.debug(`Creating signature for message: ${message}`);
 
     const encoder = new TextEncoder();
     const keyData = encoder.encode(secretKey);
@@ -50,7 +41,7 @@ async function createHmacSignature(secretKey, message) {
         .map(byte => byte.toString(16).padStart(2, "0"))
         .join("");
 
-    logger.debug(`Signature generated: ${signatureHex}`); // [DIUBAH] Menggunakan logger.debug
+    logger.debug(`Signature generated: ${signatureHex}`);
     return signatureHex;
 }
 
@@ -63,7 +54,7 @@ function generateNonce() {
     const nonce = Array.from(randomBytes)
         .map(byte => byte.toString(16).padStart(2, "0"))
         .join("");
-    logger.debug(`Nonce generated: ${nonce}`); // [DIUBAH] Menggunakan logger.debug
+    logger.debug(`Nonce generated: ${nonce}`);
     return nonce;
 }
 
@@ -108,13 +99,15 @@ export async function mutationHeaders(payload) {
 
         return headers;
     } catch (error) {
-        console.error('[ERROR] Failed to generate signature headers:', error);
+        logger.error('[ERROR] Failed to generate signature headers:', error);
         // Jika gagal, kembalikan objek kosong agar tidak menghentikan request
         return {};
     }
 }
 
-// Tambahan: Test function untuk debugging
+/**
+ * Test function untuk debugging
+ */
 export async function testSignature() {
     logger.info("[TEST] Testing signature generation...");
 

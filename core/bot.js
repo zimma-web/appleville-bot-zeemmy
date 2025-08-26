@@ -4,11 +4,10 @@
 // =================================================================
 
 import { logger } from '../utils/logger.js';
-import { api, CaptchaError, SignatureError } from '../services/api.js';
-import { handleHarvest, handlePlanting, handleBoosterApplication, handleBatchCycle } from './handlers/actionHandlers.js';
-import { handleCaptchaRequired, checkPrestigeUpgrade, handleSignatureError } from './handlers/eventHandlers.js';
+import { api, CaptchaError } from '../services/api.js';
+import { handleHarvest, handlePlanting, handleBoosterApplication } from './handlers/actionHandlers.js';
+import { handleCaptchaRequired, checkPrestigeUpgrade } from './handlers/eventHandlers.js';
 import { displayStatus } from './utils/display.js';
-import { BATCH_SETTINGS } from '../config.js';
 
 export class Bot {
     constructor(config) {
@@ -21,7 +20,6 @@ export class Bot {
         this.captchaCheckInterval = null;
         this.statusInterval = null;
         this.prestigeCheckInterval = null;
-        this.batchCycleInterval = null;
         this.notifiedPrestigeLevel = 0;
         this.isBuyingSeed = false;
         this.isBuyingBooster = false;
@@ -36,22 +34,11 @@ export class Bot {
             const { user, state } = await api.getState();
             this.userIdentifier = user?.rewardWalletAddress || 'Unknown Account';
             this.notifiedPrestigeLevel = user?.prestigeLevel || 0;
-
-            if (BATCH_SETTINGS.ENABLED_SEEDS.includes(this.config.seedKey)) {
-                logger.info(`Bibit '${this.config.seedKey}' terdeteksi sebagai bibit cepat. Menggunakan mode Batch Processing.`);
-                await this.initializeBatchMode(state);
-                // Jalankan siklus pertama segera, lalu atur interval
-                this.runBatchCycle();
-                this.batchCycleInterval = setInterval(() => this.runBatchCycle(), BATCH_SETTINGS.INTERVAL);
-            } else {
-                logger.info(`Menggunakan mode Individual Timer untuk bibit '${this.config.seedKey}'.`);
-                await this.initializeIndividualMode(state);
-            }
-
+            await this.initializeSlots(state);
         } catch (error) {
-            if (error instanceof CaptchaError) await this.handleCaptchaRequired();
-            else if (error instanceof SignatureError) await this.handleSignatureError(error);
-            else {
+            if (error instanceof CaptchaError) {
+                await this.handleCaptchaRequired();
+            } else {
                 logger.error(`Gagal inisialisasi bot: ${error.message}`);
                 return this.stop();
             }
@@ -72,57 +59,48 @@ export class Bot {
         clearInterval(this.statusInterval);
         clearInterval(this.captchaCheckInterval);
         clearInterval(this.prestigeCheckInterval);
-        clearInterval(this.batchCycleInterval);
 
         logger.success('Bot berhenti dengan aman.');
         process.exit(0);
     }
 
-    async initializeIndividualMode(initialState) {
-        logger.info('Inisialisasi slot (Mode Individual)...');
-        this.clearAllTimers();
-        const slotMap = new Map(initialState.plots.map(p => [p.slotIndex, p]));
-        for (const slotIndex of this.config.slots) {
-            if (!this.isRunning) break;
-            const slot = slotMap.get(slotIndex);
-            if (slot?.seed) this.setHarvestTimer(slotIndex, new Date(slot.seed.endsAt).getTime());
-            else await this.handlePlanting(slotIndex);
-            if (slot?.modifier) this.setBoosterTimer(slotIndex, new Date(slot.modifier.endsAt).getTime());
-            else if (this.config.boosterKey && slot?.seed) await this.handleBoosterApplication(slotIndex);
-        }
-    }
-
-    // [LOGIKA BARU] Inisialisasi yang lebih cerdas dan sederhana untuk mode batch
-    async initializeBatchMode(initialState) {
-        logger.info('Inisialisasi slot (Mode Batch)...');
-        this.clearAllTimers();
-
-        // Hanya sinkronkan booster di awal. Siklus batch akan menangani sisanya.
-        if (this.config.boosterKey) {
-            logger.info('Menyinkronkan status booster awal...');
-            const slotMap = new Map(initialState.plots.map(p => [p.slotIndex, p]));
-            for (const slotIndex of this.config.slots) {
-                const slot = slotMap.get(slotIndex);
-                if (slot?.seed && !slot.modifier) {
-                    await this.handleBoosterApplication(slotIndex);
-                }
-            }
-        }
-        logger.info('Inisialisasi selesai. Memulai siklus batch...');
-    }
-
-    clearAllTimers() {
+    async initializeSlots(initialState) {
+        logger.info('Inisialisasi slot...');
         this.plantTimers.forEach(timer => clearTimeout(timer));
         this.boosterTimers.forEach(timer => clearTimeout(timer));
         this.plantTimers.clear();
         this.boosterTimers.clear();
+
+        const slotMap = new Map(initialState.plots.map(p => [p.slotIndex, p]));
+
+        for (const slotIndex of this.config.slots) {
+            if (!this.isRunning) break;
+            const slot = slotMap.get(slotIndex);
+
+            if (slot?.seed) {
+                this.setHarvestTimer(slotIndex, new Date(slot.seed.endsAt).getTime());
+            } else {
+                await this.handlePlanting(slotIndex);
+            }
+
+            if (slot?.modifier) {
+                this.setBoosterTimer(slotIndex, new Date(slot.modifier.endsAt).getTime());
+            } else if (this.config.boosterKey && slot?.seed) {
+                await this.handleBoosterApplication(slotIndex);
+            }
+        }
     }
 
-    // --- MANAJEMEN TIMER (Hanya untuk mode individual) ---
+    // --- MANAJEMEN TIMER ---
+
     setHarvestTimer(slotIndex, endsAt) {
         this.slotStates.set(slotIndex, { ...this.slotStates.get(slotIndex), plantEndsAt: endsAt });
+
         const duration = endsAt - Date.now();
-        if (duration <= 0) { this.handleHarvest(slotIndex); return; }
+        if (duration <= 0) {
+            this.handleHarvest(slotIndex);
+            return;
+        }
         if (this.plantTimers.has(slotIndex)) clearTimeout(this.plantTimers.get(slotIndex));
         const timer = setTimeout(() => this.handleHarvest(slotIndex), duration);
         this.plantTimers.set(slotIndex, timer);
@@ -130,20 +108,40 @@ export class Bot {
 
     setBoosterTimer(slotIndex, endsAt) {
         this.slotStates.set(slotIndex, { ...this.slotStates.get(slotIndex), boosterEndsAt: endsAt });
+
         const duration = endsAt - Date.now();
-        if (duration <= 0) { this.handleBoosterApplication(slotIndex); return; }
+        if (duration <= 0) {
+            this.handleBoosterApplication(slotIndex);
+            return;
+        }
         if (this.boosterTimers.has(slotIndex)) clearTimeout(this.boosterTimers.get(slotIndex));
         const timer = setTimeout(() => this.handleBoosterApplication(slotIndex), duration);
         this.boosterTimers.set(slotIndex, timer);
     }
 
-    // --- MEMANGGIL HANDLER ---
-    runBatchCycle() { handleBatchCycle(this); }
-    handleCaptchaRequired() { handleCaptchaRequired(this); }
-    handleSignatureError(error) { handleSignatureError(this, error); }
-    checkPrestigeUpgrade() { checkPrestigeUpgrade(this); }
-    handleHarvest(slotIndex) { handleHarvest(this, slotIndex); }
-    handlePlanting(slotIndex) { handlePlanting(this, slotIndex); }
-    handleBoosterApplication(slotIndex) { handleBoosterApplication(this, slotIndex); }
-    displayStatus() { displayStatus(this); }
+    // --- MEMANGGIL HANDLER EKSTERNAL ---
+
+    handleCaptchaRequired() {
+        handleCaptchaRequired(this);
+    }
+
+    checkPrestigeUpgrade() {
+        checkPrestigeUpgrade(this);
+    }
+
+    handleHarvest(slotIndex) {
+        handleHarvest(this, slotIndex);
+    }
+
+    handlePlanting(slotIndex) {
+        handlePlanting(this, slotIndex);
+    }
+
+    handleBoosterApplication(slotIndex) {
+        handleBoosterApplication(this, slotIndex);
+    }
+
+    displayStatus() {
+        displayStatus(this);
+    }
 }

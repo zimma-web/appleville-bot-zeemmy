@@ -1,6 +1,8 @@
 # File konfigurasi pribadi (JANGAN DI-COMMIT)
 akun.txt
 telegram-config.js
+utils/signature-config.js
+debug-chunk.js
 .env
 # Dependensi Node.js
 node_modules/
