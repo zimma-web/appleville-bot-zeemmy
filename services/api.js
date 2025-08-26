@@ -42,9 +42,16 @@ async function fetchWithRetry(url, options, retries = API_SETTINGS.MAX_RETRIES) 
                 if (response.status === 421 || response.status === 412) {
                     throw new CaptchaError('Captcha required by server.');
                 }
+
+                // [DIUBAH] Deteksi error signature yang lebih spesifik
+                if (response.status === 401 && errorBody.includes('SUSPICIOUS REQUEST DETECTED')) {
+                    throw new SignatureError('Suspicious request detected (likely invalid signature).');
+                }
+
                 if (errorBody.includes('Invalid request signature') || errorBody.includes('Missing signature')) {
                     throw new SignatureError('Signature error: ' + errorBody);
                 }
+
                 throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${errorBody}`);
             }
             return response;
@@ -59,10 +66,14 @@ async function fetchWithRetry(url, options, retries = API_SETTINGS.MAX_RETRIES) 
 
 function parseTrpcResponse(text) {
     try {
-        const json = JSON.parse(text);
-        if (Array.isArray(json) && json.length > 0) return json[0];
-        return json;
-    } catch {
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+        if (lines.length === 0) {
+            throw new Error("Empty JSONL response from server.");
+        }
+        const lastLine = lines[lines.length - 1];
+        return JSON.parse(lastLine);
+    } catch (e) {
+        logger.error(`Failed to parse tRPC response: ${text}`);
         throw new Error(`Invalid JSON response: ${text.slice(0, 200)}`);
     }
 }
@@ -72,9 +83,22 @@ async function trpcPost(path, payload) {
     const sigPayload = payload?.[0]?.json ?? null;
     try {
         const headers = {
-            'accept': 'application/json', 'content-type': 'application/json', 'cookie': COOKIE,
-            'origin': 'https://app.appleville.xyz', 'referer': 'https://app.appleville.xyz/',
-            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9,id;q=0.8',
+            'content-type': 'application/json',
+            'cookie': COOKIE,
+            'origin': 'https://app.appleville.xyz',
+            'priority': 'u=1, i',
+            'referer': 'https://app.appleville.xyz/',
+            'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'trpc-accept': 'application/jsonl',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+            'x-trpc-source': 'nextjs-react',
             ...(await mutationHeaders(sigPayload)),
         };
         const res = await fetchWithRetry(url, { method: 'POST', headers, body: JSON.stringify(payload) });
@@ -106,8 +130,20 @@ async function trpcGet(path) {
 const handleApiResponse = (response) => {
     const error = response?.error?.json || response?.result?.error;
     if (error) return { ok: false, error };
-    const data = response?.result?.data?.json;
-    return { ok: true, data };
+
+    let data = response?.result?.data?.json;
+    if (data) return { ok: true, data };
+
+    if (response.json && Array.isArray(response.json)) {
+        try {
+            const potentialData = response.json[2][0][0];
+            if (typeof potentialData === 'object' && potentialData !== null) {
+                return { ok: true, data: potentialData };
+            }
+        } catch (e) { }
+    }
+
+    return { ok: false, error: { message: 'Unknown API response format' } };
 };
 
 export const api = {
@@ -136,7 +172,6 @@ export const api = {
         const response = await trpcPost('core.buyItem', payloads.buyItemPayload(key, quantity));
         return handleApiResponse(response);
     },
-    // [FUNGSI BARU] Untuk aksi massal
     harvestMultiple: async (slotIndexes) => {
         const response = await trpcPost('core.harvest', payloads.harvestMultiplePayload(slotIndexes));
         return handleApiResponse(response);
