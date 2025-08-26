@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS = {
     BOOSTER: 'quantum-fertilizer',
     BUY_QTY_BOOSTER: 12,
     AUTO_REFRESH_BOOSTER: true,
-    DEBUG_MODE: false, // Ubah ke true untuk mengaktifkan debug.
+    DEBUG_MODE: true, // Ubah ke true untuk mengaktifkan debug.
 };
 
 /**

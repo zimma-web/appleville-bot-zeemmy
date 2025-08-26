@@ -1,28 +1,72 @@
 // =================================================================
-// SIGNATURE UTILITY
+// SIGNATURE UTILITY (Updated to match source)
 // Berisi logika untuk membuat signature pada request mutation.
-// Kode ini tidak diubah dari source aslinya untuk menjaga validitas.
+// Diperbarui untuk match dengan implementasi asli dari source code.
 // =================================================================
 
-import crypto from 'crypto';
-
-const SECRET_KEY = "aspih0f7303f0248gh204429g24d9jah9dsg97h9!eda";
+/**
+ * Secret key pattern dari source code asli
+ */
+function getSecretKey() {
+    const keyParts = ["asasdads23232!eda", "3", "3ed@#@!@#Ffdf#@!", "4"];
+    const pattern = [1, 1, 2, 1, 2]; // dari source: let d = [1, 1, 2, 1, 2]
+    return pattern.map(index => keyParts[index]).join("");
+}
 
 /**
- * Membuat signature HMAC-SHA256 berdasarkan payload.
- * @param {object | null} inputPayload - Payload JSON dari request.
- * @returns {Promise<{signature: string, timestamp: number, nonce: string}>}
+ * Header constants yang sesuai dengan source
+ */
+const HEADER_NAMES = {
+    META_HASH: "x-xas3d",
+    CLIENT_TIME: "x-mhab",
+    TRACE_ID: "x-2sa3"
+};
+
+/**
+ * Membuat HMAC signature menggunakan Web Crypto API (sama seperti source)
+ */
+async function createHmacSignature(secretKey, message) {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secretKey);
+    const messageData = encoder.encode(message);
+
+    const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+    );
+
+    const signature = await crypto.subtle.sign("HMAC", cryptoKey, messageData);
+
+    return Array.from(new Uint8Array(signature))
+        .map(byte => byte.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+/**
+ * Generate random nonce (sama seperti source)
+ */
+function generateNonce() {
+    const randomBytes = new Uint8Array(16);
+    crypto.getRandomValues(randomBytes);
+    return Array.from(randomBytes)
+        .map(byte => byte.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+/**
+ * Membuat signature lengkap (sama seperti fungsi m() di source)
  */
 async function generateSignature(inputPayload) {
     const timestamp = Date.now();
-    const nonce = crypto.randomBytes(16).toString('hex');
-    const payloadString = JSON.stringify(inputPayload ?? {});
+    const nonce = generateNonce();
+    const payloadString = JSON.stringify(inputPayload);
     const message = `${timestamp}.${nonce}.${payloadString}`;
 
-    const signature = crypto
-        .createHmac('sha256', SECRET_KEY)
-        .update(message, 'utf8')
-        .digest('hex');
+    const secretKey = getSecretKey();
+    const signature = await createHmacSignature(secretKey, message);
 
     return { signature, timestamp, nonce };
 }
@@ -36,11 +80,12 @@ export async function mutationHeaders(payload) {
     try {
         const { signature, timestamp, nonce } = await generateSignature(payload);
         return {
-            'x-meta-hash': signature,
-            'x-client-time': String(timestamp),
-            'x-trace-id': nonce,
+            [HEADER_NAMES.META_HASH]: signature,
+            [HEADER_NAMES.CLIENT_TIME]: timestamp.toString(),
+            [HEADER_NAMES.TRACE_ID]: nonce,
         };
     } catch (error) {
+        console.error('Failed to generate signature headers:', error);
         // Jika gagal, kembalikan objek kosong agar tidak menghentikan request
         return {};
     }
