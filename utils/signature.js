@@ -1,80 +1,87 @@
 // =================================================================
-// SIGNATURE UTILITY
-// File ini menggunakan konfigurasi dari signature-config.js
-// Hanya perlu di-update jika ada perubahan algoritma, bukan konfigurasi.
+// SIGNATURE GENERATOR
+// Menggabungkan logika webcrypto dengan pemuatan konfigurasi dinamis.
 // =================================================================
 
 import { webcrypto } from 'crypto';
+import fs from 'fs';
 import { logger } from './logger.js';
-import { SIGNATURE_PATTERN, KEY_PARTS, HEADER_NAMES } from './signature-config.js';
+
+let signatureConfig = {};
 
 /**
- * Secret key pattern dari source code asli
+ * Memastikan file signature-config.js ada. Jika tidak, buat file sementara.
  */
-function getSecretKey() {
-    const secretKey = SIGNATURE_PATTERN.map(index => KEY_PARTS[index]).join("");
-    logger.debug(`Secret key generated: ${secretKey}`);
-    return secretKey;
+function ensureConfigFile() {
+    const configPath = './utils/signature-config.js';
+    if (!fs.existsSync(configPath)) {
+        const content = `
+export const SIGNATURE_PATTERN = [];
+export const KEY_PARTS = [];
+export const HEADER_NAMES = {};`;
+        fs.writeFileSync(configPath, content, 'utf8');
+        logger.warn('File signature-config.js tidak ditemukan, file sementara telah dibuat.');
+    }
 }
 
 /**
- * Membuat HMAC signature menggunakan Web Crypto API (sama seperti source)
+ * Memuat atau memuat ulang file signature-config.js secara dinamis.
+ * Ini adalah kunci untuk memperbaiki infinite loop.
+ */
+export async function loadSignatureConfig() {
+    const configPath = './signature-config.js';
+    const timestamp = Date.now();
+    try {
+        // Impor modul dengan query unik untuk bypass cache Node.js
+        const module = await import(`${configPath}?v=${timestamp}`);
+        signatureConfig = {
+            SIGNATURE_PATTERN: module.SIGNATURE_PATTERN,
+            KEY_PARTS: module.KEY_PARTS,
+            HEADER_NAMES: module.HEADER_NAMES
+        };
+        logger.info('Konfigurasi signature berhasil dimuat/dimuat ulang ke dalam memori.');
+    } catch (error) {
+        logger.error(`Gagal memuat signature-config.js: ${error.message}`);
+        signatureConfig = { SIGNATURE_PATTERN: [], KEY_PARTS: [], HEADER_NAMES: {} };
+    }
+}
+
+// Pengecekan dan pemuatan awal
+ensureConfigFile();
+await loadSignatureConfig();
+
+/**
+ * Menghasilkan secret key berdasarkan pattern dan key parts dari config yang dimuat.
+ */
+function getSecretKey() {
+    const { SIGNATURE_PATTERN, KEY_PARTS } = signatureConfig;
+    if (!SIGNATURE_PATTERN || !KEY_PARTS) return "";
+    return SIGNATURE_PATTERN.map(index => KEY_PARTS[index]).join("");
+}
+
+/**
+ * Membuat HMAC signature menggunakan Web Crypto API.
  */
 async function createHmacSignature(secretKey, message) {
-    logger.debug(`Creating signature for message: ${message}`);
-
     const encoder = new TextEncoder();
     const keyData = encoder.encode(secretKey);
     const messageData = encoder.encode(message);
 
     const cryptoKey = await webcrypto.subtle.importKey(
-        "raw",
-        keyData,
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign"]
+        "raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
     );
 
     const signature = await webcrypto.subtle.sign("HMAC", cryptoKey, messageData);
-
-    const signatureHex = Array.from(new Uint8Array(signature))
-        .map(byte => byte.toString(16).padStart(2, "0"))
-        .join("");
-
-    logger.debug(`Signature generated: ${signatureHex}`);
-    return signatureHex;
+    return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
- * Generate random nonce (sama seperti source)
+ * Generate random nonce.
  */
 function generateNonce() {
     const randomBytes = new Uint8Array(16);
     webcrypto.getRandomValues(randomBytes);
-    const nonce = Array.from(randomBytes)
-        .map(byte => byte.toString(16).padStart(2, "0"))
-        .join("");
-    logger.debug(`Nonce generated: ${nonce}`);
-    return nonce;
-}
-
-/**
- * Membuat signature lengkap (sama seperti fungsi m() di source)
- */
-async function generateSignature(inputPayload) {
-    const timestamp = Date.now();
-    const nonce = generateNonce();
-    const payloadString = JSON.stringify(inputPayload ?? null);
-    const message = `${timestamp}.${nonce}.${payloadString}`;
-
-    logger.debug(`Timestamp: ${timestamp}`);
-    logger.debug(`Payload string: ${payloadString}`);
-    logger.debug(`Full message: ${message}`);
-
-    const secretKey = getSecretKey();
-    const signature = await createHmacSignature(secretKey, message);
-
-    return { signature, timestamp, nonce };
+    return Array.from(randomBytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -84,9 +91,24 @@ async function generateSignature(inputPayload) {
  */
 export async function mutationHeaders(payload) {
     try {
-        logger.debug(`mutationHeaders called with payload: ${JSON.stringify(payload)}`);
+        const { HEADER_NAMES } = signatureConfig;
+        if (!HEADER_NAMES || !HEADER_NAMES.META_HASH) {
+            logger.warn('Konfigurasi signature tidak lengkap. Melewatkan pembuatan signature.');
+            return {};
+        }
 
-        const { signature, timestamp, nonce } = await generateSignature(payload);
+        const timestamp = Date.now();
+        const nonce = generateNonce();
+        const payloadString = JSON.stringify(payload ?? null);
+        const message = `${timestamp}.${nonce}.${payloadString}`;
+        const secretKey = getSecretKey();
+
+        if (!secretKey) {
+            logger.warn('Secret key kosong. Tidak dapat membuat signature.');
+            return {};
+        }
+
+        const signature = await createHmacSignature(secretKey, message);
 
         const headers = {
             [HEADER_NAMES.META_HASH]: signature,
@@ -94,28 +116,10 @@ export async function mutationHeaders(payload) {
             [HEADER_NAMES.TRACE_ID]: nonce,
         };
 
-        logger.debug(`Headers generated: ${JSON.stringify(headers)}`);
-        logger.debug(`Header names used: ${JSON.stringify(HEADER_NAMES)}`);
-
+        logger.debug(`Headers generated for path with payload: ${JSON.stringify(payload)}`);
         return headers;
     } catch (error) {
-        logger.error('[ERROR] Failed to generate signature headers:', error);
-        // Jika gagal, kembalikan objek kosong agar tidak menghentikan request
+        logger.error('[ERROR] Gagal membuat signature headers:', error);
         return {};
     }
-}
-
-/**
- * Test function untuk debugging
- */
-export async function testSignature() {
-    logger.info("[TEST] Testing signature generation...");
-
-    const testPayload = { test: "data" };
-    const headers = await mutationHeaders(testPayload);
-
-    logger.info(`[TEST] Test completed. Headers: ${JSON.stringify(headers)}`);
-    logger.info(`[TEST] Expected header names: ${JSON.stringify(Object.values(HEADER_NAMES))}`);
-
-    return headers;
 }

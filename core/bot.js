@@ -4,9 +4,9 @@
 // =================================================================
 
 import { logger } from '../utils/logger.js';
-import { api, CaptchaError } from '../services/api.js';
+import { api, CaptchaError, SignatureError } from '../services/api.js';
 import { handleHarvest, handlePlanting, handleBoosterApplication } from './handlers/actionHandlers.js';
-import { handleCaptchaRequired, checkPrestigeUpgrade } from './handlers/eventHandlers.js';
+import { handleCaptchaRequired, checkPrestigeUpgrade, handleSignatureError } from './handlers/eventHandlers.js';
 import { displayStatus } from './utils/display.js';
 
 export class Bot {
@@ -17,6 +17,7 @@ export class Bot {
         this.slotStates = new Map();
         this.isRunning = false;
         this.isPausedForCaptcha = false;
+        this.isPausedForSignature = false; // State untuk jeda karena signature error
         this.captchaCheckInterval = null;
         this.statusInterval = null;
         this.prestigeCheckInterval = null;
@@ -38,6 +39,8 @@ export class Bot {
         } catch (error) {
             if (error instanceof CaptchaError) {
                 await this.handleCaptchaRequired();
+            } else if (error instanceof SignatureError) {
+                await this.handleSignatureError();
             } else {
                 logger.error(`Gagal inisialisasi bot: ${error.message}`);
                 return this.stop();
@@ -54,8 +57,7 @@ export class Bot {
         this.isRunning = false;
         logger.warn('Menghentikan bot...');
 
-        this.plantTimers.forEach(timer => clearTimeout(timer));
-        this.boosterTimers.forEach(timer => clearTimeout(timer));
+        this.clearAllTimers();
         clearInterval(this.statusInterval);
         clearInterval(this.captchaCheckInterval);
         clearInterval(this.prestigeCheckInterval);
@@ -64,12 +66,16 @@ export class Bot {
         process.exit(0);
     }
 
-    async initializeSlots(initialState) {
-        logger.info('Inisialisasi slot...');
+    clearAllTimers() {
         this.plantTimers.forEach(timer => clearTimeout(timer));
         this.boosterTimers.forEach(timer => clearTimeout(timer));
         this.plantTimers.clear();
         this.boosterTimers.clear();
+    }
+
+    async initializeSlots(initialState) {
+        logger.info('Inisialisasi slot...');
+        this.clearAllTimers();
 
         const slotMap = new Map(initialState.plots.map(p => [p.slotIndex, p]));
 
@@ -123,6 +129,10 @@ export class Bot {
 
     handleCaptchaRequired() {
         handleCaptchaRequired(this);
+    }
+
+    handleSignatureError() {
+        handleSignatureError(this);
     }
 
     checkPrestigeUpgrade() {

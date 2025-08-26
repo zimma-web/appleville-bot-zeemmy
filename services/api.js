@@ -16,6 +16,14 @@ export class CaptchaError extends Error {
     }
 }
 
+// Error khusus untuk menandakan masalah signature.
+export class SignatureError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'SignatureError';
+    }
+}
+
 // Variabel global untuk menyimpan cookie, akan di-set saat inisialisasi.
 let COOKIE = '';
 
@@ -40,55 +48,53 @@ async function fetchWithRetry(url, options, retries = API_SETTINGS.MAX_RETRIES) 
             const response = await fetch(url, { ...options, signal: controller.signal });
             clearTimeout(timeoutId);
 
-            // =====================================================================
-            // == PERBAIKAN LOGIKA CAPTCHA DIMULAI DI SINI ==
-            // =====================================================================
-
-            // Kondisi 1: Cek status 412 secara langsung.
+            // Penanganan Captcha (tidak berubah)
             if (response.status === 412) {
                 throw new CaptchaError('Captcha required by server (status 412).');
             }
-
-            // Kondisi 2: Cek isi body jika status 200 OK, karena server bisa mengirim pesan captcha di body.
-            // Gunakan response.clone() agar body bisa dibaca di sini dan tetap utuh untuk fungsi pemanggil.
             if (response.ok) {
                 const clonedResponse = response.clone();
                 try {
-                    const data = await clonedResponse.json(); // Baca dari hasil duplikat
+                    const data = await clonedResponse.json();
                     const errorMessage = data?.message || data?.error?.json?.message || '';
-
-                    // Jika ada pesan captcha di dalam body JSON
                     if (errorMessage.toLowerCase().includes('captcha verification required')) {
                         throw new CaptchaError('Captcha verification required in response body.');
                     }
                 } catch (e) {
-                    // Jika error adalah CaptchaError, lempar lagi.
                     if (e instanceof CaptchaError) throw e;
-                    // Abaikan error lain (misal: body bukan JSON), karena kita hanya peduli pesan captcha.
+                    // Abaikan error lain (misal: body bukan JSON)
                 }
             }
-            // =====================================================================
-            // == PERBAIKAN LOGIKA CAPTCHA SELESAI ==
-            // =====================================================================
 
-            // Kode ini sekarang hanya menangani error umum, bukan lagi captcha.
+            // Penanganan Signature Error dan Error Umum
             if (!response.ok) {
-                let errorBody = 'Could not read error body.';
+                let responseText = 'Could not read error body.';
                 try {
-                    errorBody = await response.text();
+                    responseText = await response.text();
                 } catch { }
-                // Error 412 sudah ditangani di atas, jadi ini untuk error 4xx/5xx lainnya.
-                throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${errorBody}`);
+
+                const lowerResponseText = responseText.toLowerCase();
+                // [PERBAIKAN] Menyesuaikan string dengan typo dari server "suspicous"
+                if (
+                    (response.status === 401 && lowerResponseText.includes('suspicous request detected')) ||
+                    lowerResponseText.includes('invalid request signature') ||
+                    lowerResponseText.includes('missing signature')
+                ) {
+                    throw new SignatureError(`Signature error detected: ${responseText.slice(0, 100)}`);
+                }
+
+                // Error HTTP umum lainnya
+                throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${responseText}`);
             }
 
-            // Kembalikan response asli yang bodynya belum terbaca
             return response;
 
         } catch (error) {
-            // Jika error adalah CaptchaError, langsung lempar lagi tanpa mencoba ulang.
-            if (error instanceof CaptchaError) {
+            // Jika error adalah CaptchaError atau SignatureError, langsung lempar tanpa mencoba ulang.
+            if (error instanceof CaptchaError || error instanceof SignatureError) {
                 throw error;
             }
+
             logger.debug(`Fetch attempt ${attempt}/${retries} failed: ${error.message}`);
             if (attempt === retries) throw error;
             await sleep(API_SETTINGS.RETRY_DELAY * Math.pow(2, attempt - 1));
@@ -132,8 +138,8 @@ async function trpcPost(path, payload) {
         logger.debug(`Response from ${path}: ${text}`);
         return parseTrpcResponse(text);
     } catch (error) {
-        // Jika ini CaptchaError, lempar lagi agar bot bisa menangkapnya.
-        if (error instanceof CaptchaError) {
+        // Lempar lagi error agar bot bisa menangkapnya.
+        if (error instanceof CaptchaError || error instanceof SignatureError) {
             throw error;
         }
         logger.error(`trpcPost failed for ${path}: ${error.message}`);
@@ -151,7 +157,7 @@ async function trpcGet(path) {
         const text = await res.text();
         return JSON.parse(text);
     } catch (error) {
-        if (error instanceof CaptchaError) {
+        if (error instanceof CaptchaError || error instanceof SignatureError) {
             throw error;
         }
         logger.error(`trpcGet failed for ${path}: ${error.message}`);
@@ -164,7 +170,6 @@ async function trpcGet(path) {
 const handleApiResponse = (response) => {
     const error = response?.error?.json || response?.result?.error;
     if (error) {
-        // Jangan log error di sini, biarkan pemanggil yang menangani
         return { ok: false, error };
     }
     const data = response?.result?.data?.json;
