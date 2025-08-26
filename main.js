@@ -11,6 +11,8 @@ import { logger } from './utils/logger.js';
 import { setCookie, api } from './services/api.js';
 import { DEFAULT_SETTINGS, SEEDS, BOOSTERS, PRESTIGE_LEVELS } from './config.js';
 import { Bot } from './core/bot.js';
+import { updateSignature } from './utils/signature-updater.js';
+import { loadSignatureConfig } from './utils/signature.js';
 
 // --- FUNGSI INTERAKSI PENGGUNA ---
 
@@ -119,6 +121,27 @@ export const TELEGRAM_SETTINGS = {
     logger.success('Konfigurasi Telegram berhasil disimpan di telegram-config.js');
 }
 
+/**
+ * Memvalidasi konfigurasi signature yang ada.
+ * @returns {boolean} - True jika valid, false jika tidak.
+ */
+async function validateSignatureConfig() {
+    try {
+        const configPath = './utils/signature-config.js';
+        // Menggunakan import dinamis untuk mendapatkan data terbaru
+        const module = await import(`${configPath}?v=${Date.now()}`);
+        const { SIGNATURE_PATTERN, KEY_PARTS, HEADER_NAMES } = module;
+
+        if (!SIGNATURE_PATTERN || SIGNATURE_PATTERN.length === 0) return false;
+        if (!KEY_PARTS || KEY_PARTS.length === 0) return false;
+        if (!HEADER_NAMES || !HEADER_NAMES.META_HASH) return false;
+
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
 
 // --- FUNGSI UTAMA ---
 
@@ -128,6 +151,24 @@ async function start() {
         setCookie(cookie);
 
         await ensureTelegramConfigInteractive();
+
+        // [LOGIKA BARU] Pengecekan signature proaktif
+        logger.info('\nMemvalidasi konfigurasi signature...');
+        const isSignatureValid = await validateSignatureConfig();
+        if (!isSignatureValid) {
+            logger.warn('Konfigurasi signature tidak valid atau kosong. Menjalankan pembaruan...');
+            try {
+                await updateSignature();
+                await loadSignatureConfig(); // Muat ulang config setelah update
+            } catch (error) {
+                logger.error(`Gagal memperbarui signature secara otomatis: ${error.message}`);
+                logger.error('Bot akan berhenti. Coba jalankan ulang.');
+                process.exit(1);
+            }
+        } else {
+            logger.success('Konfigurasi signature valid.');
+        }
+
 
         // Verifikasi koneksi dan cookie
         logger.info('\nMemverifikasi koneksi dan cookie...');
@@ -167,7 +208,7 @@ async function start() {
         let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : allSlots;
         if (!slots.length) slots = allSlots;
 
-        // [DIUBAH] Menampilkan daftar bibit yang sesuai dengan level prestige
+        // Menampilkan daftar bibit yang sesuai dengan level prestige
         console.log('\n--- Bibit Tersedia ---');
         Object.entries(SEEDS)
             .filter(([key, seedData]) => !seedData.prestige || seedData.prestige <= userPrestigeLevel)
@@ -183,7 +224,7 @@ async function start() {
             process.exit(1);
         }
 
-        // [DIUBAH] Menampilkan daftar booster yang sesuai dengan level prestige
+        // Menampilkan daftar booster yang sesuai dengan level prestige
         console.log('\n--- Booster Tersedia ---');
         Object.entries(BOOSTERS)
             .filter(([key, boosterData]) => !boosterData.prestige || boosterData.prestige <= userPrestigeLevel)
@@ -215,8 +256,8 @@ async function start() {
             slots,
             seedKey,
             boosterKey: boosterKey === 'none' ? null : boosterKey,
-            seedBuyQty, // Menggunakan nilai dari input pengguna
-            boosterBuyQty, // Menggunakan nilai dari input pengguna
+            seedBuyQty,
+            boosterBuyQty,
         };
 
         // Membuat instance bot dan memulainya
