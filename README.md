@@ -1,4 +1,4 @@
-# 🤖 AppleVille Smart Bot — Arsitektur Modern & Andal
+# 🤖 AppleVille Smart Bot
 
 Bot Node.js yang dirancang ulang dengan arsitektur modern untuk otomatisasi **tanam, booster, dan panen** di AppleVille. Bot ini beroperasi dengan presisi tinggi, mengelola setiap slot secara independen dan paralel, serta dilengkapi dengan notifikasi Telegram cerdas.
 
