@@ -1,6 +1,6 @@
 // =================================================================
-// BOT CORE LOGIC
-// Jantung dari bot. Mengelola state, timer, dan siklus aksi.
+// BOT CORE LOGIC (IMPROVED)
+// Jantung dari bot dengan logika transisi yang lebih baik.
 // =================================================================
 
 import { logger } from '../utils/logger.js';
@@ -18,11 +18,13 @@ export class Bot {
         this.plantTimers = new Map();
         this.boosterTimers = new Map();
         this.slotStates = new Map();
-        this.batchTimer = null; // [DIUBAH] Menggantikan batchCycleInterval
+        this.batchTimer = null;
+        this.transitionTimer = null; // Timer untuk transisi mode
         this.isRunning = false;
         this.isPausedForCaptcha = false;
         this.isPausedForSignature = false;
         this.isBatchCycleRunning = false;
+        this.isInTransitionMode = false; // Flag untuk mode transisi
         this.captchaCheckInterval = null;
         this.statusInterval = null;
         this.prestigeCheckInterval = null;
@@ -60,7 +62,6 @@ export class Bot {
 
         this.statusInterval = setInterval(() => this.displayStatus(), 1000);
         this.prestigeCheckInterval = setInterval(() => this.checkPrestigeUpgrade(), 300000);
-        // Interval batch yang lama dihapus, sekarang diatur secara dinamis
         process.on('SIGINT', () => this.stop());
     }
 
@@ -81,7 +82,8 @@ export class Bot {
     clearAllTimers() {
         this.plantTimers.forEach(timer => clearTimeout(timer));
         this.boosterTimers.forEach(timer => clearTimeout(timer));
-        clearTimeout(this.batchTimer); // Hapus timer batch utama
+        clearTimeout(this.batchTimer);
+        clearTimeout(this.transitionTimer);
         this.plantTimers.clear();
         this.boosterTimers.clear();
     }
@@ -99,8 +101,50 @@ export class Bot {
             let nextBatchHarvestTime = Infinity;
             let isBatchModeActive = BATCH_SETTINGS.ENABLED_SEEDS.includes(this.config.seedKey);
 
-            if (isBatchModeActive) {
-                // [LOGIKA BATCH BARU] Cari waktu panen terdekat untuk bibit batch
+            // Periksa apakah ada tanaman lama yang sedang tumbuh
+            const hasOldCrops = plots.some(p =>
+                p.seed &&
+                p.seed.key !== this.config.seedKey &&
+                new Date(p.seed.endsAt).getTime() > Date.now()
+            );
+
+            if (hasOldCrops && isBatchModeActive && !this.isInTransitionMode) {
+                logger.warn('Terdeteksi tanaman lama yang masih tumbuh!');
+                logger.warn('Menggunakan mode individual sambil menunggu tanaman lama selesai...');
+
+                this.isInTransitionMode = true;
+
+                // HANYA atur timer untuk tanaman lama, tidak untuk yang baru
+                for (const slot of plots) {
+                    if (slot.seed && slot.seed.key !== this.config.seedKey) {
+                        const endsAt = new Date(slot.seed.endsAt).getTime();
+                        if (endsAt > Date.now()) {
+                            logger.info(`Slot ${slot.slotIndex}: Menunggu ${slot.seed.key} selesai...`);
+                            this.setHarvestTimer(slot.slotIndex, endsAt);
+                        }
+                    }
+                }
+
+                // Mulai proses transisi
+                const oldCrops = plots.filter(p =>
+                    p.seed &&
+                    p.seed.key !== this.config.seedKey &&
+                    new Date(p.seed.endsAt).getTime() > Date.now()
+                );
+
+                if (oldCrops.length > 0) {
+                    let latestOldCropTime = Math.max(...oldCrops.map(p => new Date(p.seed.endsAt).getTime()));
+                    const delayToTransition = latestOldCropTime - Date.now() + 2000;
+
+                    logger.info(`Transisi ke mode batch akan dimulai dalam ${Math.round(delayToTransition / 1000)} detik.`);
+                    this.transitionTimer = setTimeout(() => this.handleTransitionToBatch(), Math.max(1000, delayToTransition));
+                }
+
+            } else if (isBatchModeActive && !this.isInTransitionMode) {
+                // Mode batch murni - TIDAK ADA TIMER INDIVIDUAL
+                logger.info('Mode Batch Aktif');
+
+                // Cari waktu panen terdekat hanya untuk menentukan kapan batch cycle berikutnya
                 for (const slot of plots) {
                     if (slot.seed && this.config.seedKey === slot.seed.key) {
                         const endsAt = new Date(slot.seed.endsAt).getTime();
@@ -110,15 +154,17 @@ export class Bot {
                     }
                 }
 
-                // Atur satu timer utama untuk siklus batch berikutnya
                 if (nextBatchHarvestTime !== Infinity) {
                     const duration = nextBatchHarvestTime - Date.now();
-                    logger.info(`Mode Batch: Siklus berikutnya diatur dalam ${Math.max(0, Math.round(duration / 1000))} detik.`);
-                    // Tambahkan buffer 1 detik untuk memastikan semua slot siap
+                    logger.info(`Mode Batch: Siklus berikutnya dalam ${Math.max(0, Math.round(duration / 1000))} detik.`);
                     this.batchTimer = setTimeout(() => this.handleBatchCycle(), Math.max(0, duration) + 1000);
+                } else {
+                    // Tidak ada tanaman batch, jalankan sekarang
+                    logger.info('Mode Batch: Memulai siklus batch...');
+                    setTimeout(() => this.handleBatchCycle(), 1000);
                 }
             } else {
-                // [LOGIKA LAMA] Jika bukan mode batch, atur timer individual
+                // Mode Individual penuh
                 logger.info('Mode Individual: Mengatur timer untuk setiap slot.');
                 for (const slot of plots) {
                     if (slot.seed) {
@@ -136,6 +182,58 @@ export class Bot {
 
         } catch (error) {
             logger.warn(`Gagal memperbarui timer: ${error.message}`);
+        }
+    }
+
+    /**
+     * Fungsi khusus untuk transisi ke batch mode
+     */
+    async handleTransitionToBatch() {
+        if (!this.isRunning || this.isPausedForCaptcha || this.isPausedForSignature) return;
+
+        try {
+            logger.info('Memeriksa apakah siap untuk beralih ke mode batch...');
+            const { state } = await api.getState();
+            if (!state) return;
+
+            const plots = state.plots.filter(p => this.config.slots.includes(p.slotIndex));
+
+            // Periksa apakah masih ada tanaman lama
+            const hasOldCrops = plots.some(p =>
+                p.seed &&
+                p.seed.key !== this.config.seedKey &&
+                new Date(p.seed.endsAt).getTime() > Date.now()
+            );
+
+            if (hasOldCrops) {
+                // Masih ada tanaman lama, tunggu lagi
+                logger.warn('Masih ada tanaman lama yang belum siap dipanen. Menunggu...');
+                const oldCrops = plots.filter(p =>
+                    p.seed &&
+                    p.seed.key !== this.config.seedKey &&
+                    new Date(p.seed.endsAt).getTime() > Date.now()
+                );
+
+                let nextCheckTime = Math.min(...oldCrops.map(p => new Date(p.seed.endsAt).getTime()));
+                const delay = nextCheckTime - Date.now() + 1000;
+
+                this.transitionTimer = setTimeout(() => this.handleTransitionToBatch(), Math.max(1000, delay));
+                return;
+            }
+
+            // Semua tanaman lama sudah selesai, beralih ke mode batch
+            logger.success('Semua tanaman lama telah dipanen. Memulai mode batch!');
+            this.isInTransitionMode = false;
+
+            // Clear semua timer individual dan refresh untuk mode batch
+            this.clearAllTimers();
+
+            // Langsung jalankan batch cycle
+            setTimeout(() => this.handleBatchCycle(), 500);
+
+        } catch (error) {
+            logger.error(`Error dalam transisi ke batch: ${error.message}`);
+            this.transitionTimer = setTimeout(() => this.handleTransitionToBatch(), 5000);
         }
     }
 
