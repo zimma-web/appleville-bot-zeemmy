@@ -197,9 +197,21 @@ export const api = {
         return handleApiResponse(response);
     },
 
+    /** [BARU] Menanam di banyak slot sekaligus. */
+    plantMultiple: async (plantings) => {
+        const response = await trpcPost('core.plantSeed', payloads.plantMultiplePayload(plantings));
+        return handleApiResponse(response);
+    },
+
     /** Memanen satu slot. */
     harvestSlot: async (slotIndex) => {
         const response = await trpcPost('core.harvest', payloads.harvestPayload(slotIndex));
+        return handleApiResponse(response);
+    },
+
+    /** [BARU] Memanen banyak slot sekaligus. */
+    harvestMultiple: async (slotIndexes) => {
+        const response = await trpcPost('core.harvest', payloads.harvestMultiplePayload(slotIndexes));
         return handleApiResponse(response);
     },
 

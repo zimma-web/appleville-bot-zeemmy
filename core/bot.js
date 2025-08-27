@@ -97,6 +97,33 @@ export class Bot {
         }
     }
 
+    /**
+     * [LOGIKA BARU] Memperbarui semua timer berdasarkan state terbaru dari server.
+     * Ini adalah metode sinkronisasi utama.
+     */
+    async refreshAllTimers() {
+        if (!this.isRunning || this.isPausedForCaptcha || this.isPausedForSignature) return;
+        logger.info('Memperbarui semua timer slot...');
+        this.clearAllTimers();
+
+        try {
+            const { state } = await api.getState();
+            if (!state) return;
+
+            const plots = state.plots.filter(p => this.config.slots.includes(p.slotIndex));
+            for (const slot of plots) {
+                if (slot.seed) {
+                    this.setHarvestTimer(slot.slotIndex, new Date(slot.seed.endsAt).getTime());
+                }
+                if (slot.modifier) {
+                    this.setBoosterTimer(slot.slotIndex, new Date(slot.modifier.endsAt).getTime());
+                }
+            }
+        } catch (error) {
+            logger.warn(`Gagal memperbarui timer: ${error.message}`);
+        }
+    }
+
     // --- MANAJEMEN TIMER ---
 
     setHarvestTimer(slotIndex, endsAt) {
@@ -141,6 +168,10 @@ export class Bot {
 
     handleHarvest(slotIndex) {
         handleHarvest(this, slotIndex);
+    }
+
+    handleBatchCycle() {
+        handleBatchCycle(this);
     }
 
     handlePlanting(slotIndex) {

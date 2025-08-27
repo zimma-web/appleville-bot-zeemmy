@@ -8,7 +8,7 @@ import { api, CaptchaError, SignatureError } from '../../services/api.js';
 import { PRESTIGE_LEVELS } from '../../config.js';
 import { sendTelegramMessage } from '../../utils/telegram.js';
 import { updateSignature } from '../../utils/signature-updater.js';
-import { loadSignatureConfig } from '../../utils/signature.js'; // Impor fungsi pemuat ulang
+import { loadSignatureConfig } from '../../utils/signature.js';
 
 let TELEGRAM_SETTINGS = { ENABLED: false, CAPTCHA_RETRY_INTERVAL: 120000 };
 try {
@@ -27,6 +27,10 @@ export async function handleCaptchaRequired(bot) {
     const message = `🚨 *CAPTCHA Dibutuhkan!* 🚨\n\nAkun: \`${bot.userIdentifier}\`\n\nBot AppleVille dijeda. Mohon selesaikan CAPTCHA di browser.`;
     await sendTelegramMessage(message);
 
+    if (bot.captchaCheckInterval) {
+        clearInterval(bot.captchaCheckInterval);
+    }
+
     bot.captchaCheckInterval = setInterval(
         () => checkForCaptchaResolution(bot),
         TELEGRAM_SETTINGS.CAPTCHA_RETRY_INTERVAL
@@ -37,22 +41,27 @@ async function checkForCaptchaResolution(bot) {
     logger.info('Mencoba memeriksa status CAPTCHA...');
     try {
         const response = await api.getState();
-        if (!response.ok) {
-            logger.warn(`Pemeriksaan CAPTCHA gagal dengan pesan: ${response.error?.message}`);
-            return;
+
+        // [PERBAIKAN] Pengecekan yang lebih kuat. Tidak hanya 'ok', tapi juga validitas data.
+        // Memastikan ada data pengguna yang valid adalah bukti bahwa CAPTCHA benar-benar selesai.
+        if (response.ok && response.user && response.user.rewardWalletAddress) {
+            logger.success('CAPTCHA sepertinya sudah diselesaikan!');
+
+            const message = `✅ *CAPTCHA Selesai!* ✅\n\nAkun: \`${bot.userIdentifier}\`\n\nBot AppleVille akan melanjutkan operasi.`;
+            await sendTelegramMessage(message);
+
+            clearInterval(bot.captchaCheckInterval);
+            bot.captchaCheckInterval = null;
+            bot.isPausedForCaptcha = false;
+            await bot.initializeSlots(response.state);
+        } else {
+            // Ini menangani kasus di mana server mengirim status 'ok' tapi datanya kosong/tidak valid.
+            logger.warn('CAPTCHA masih aktif (respons tidak valid). Mencoba lagi nanti...');
         }
-
-        logger.success('CAPTCHA sepertinya sudah diselesaikan!');
-
-        const message = `✅ *CAPTCHA Selesai!* ✅\n\nAkun: \`${bot.userIdentifier}\`\n\nBot AppleVille akan melanjutkan operasi.`;
-        await sendTelegramMessage(message);
-
-        clearInterval(bot.captchaCheckInterval);
-        bot.isPausedForCaptcha = false;
-        await bot.initializeSlots(response.state);
     } catch (error) {
         if (error instanceof CaptchaError) {
-            logger.warn('CAPTCHA masih aktif. Mencoba lagi nanti...');
+            // Ini menangani kasus di mana API secara eksplisit melempar CaptchaError.
+            logger.warn('CAPTCHA masih aktif (error terdeteksi). Mencoba lagi nanti...');
         } else {
             logger.error(`Terjadi error saat memeriksa CAPTCHA: ${error.message}`);
         }
@@ -100,10 +109,7 @@ export async function handleSignatureError(bot) {
     );
 
     try {
-        // Langkah 1: Jalankan fungsi update untuk menulis file baru
         await updateSignature();
-
-        // Langkah 2: Muat ulang konfigurasi yang baru ditulis ke dalam memori
         await loadSignatureConfig();
 
         logger.info('Memverifikasi signature baru dengan mencoba terhubung...');

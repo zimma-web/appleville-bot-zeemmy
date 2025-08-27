@@ -13,6 +13,80 @@ function inventoryCount(state, key) {
     return item?.quantity || 0;
 }
 
+export async function handleBatchCycle(bot) {
+    if (!bot.isRunning || bot.isPausedForCaptcha || bot.isPausedForSignature) return;
+
+    try {
+        logger.info('Memulai siklus batch...');
+        const { state } = await api.getState();
+        if (!state) {
+            logger.warn('Gagal mendapatkan state, siklus batch dibatalkan.');
+            return;
+        }
+
+        const now = Date.now();
+        const plots = state.plots.filter(p => bot.config.slots.includes(p.slotIndex));
+
+        // 1. Tentukan slot yang akan dipanen dan yang kosong
+        const readyToHarvest = plots
+            .filter(p => p.seed && new Date(p.seed.endsAt).getTime() <= now)
+            .map(p => p.slotIndex);
+
+        const emptySlots = plots
+            .filter(p => !p.seed)
+            .map(p => p.slotIndex);
+
+        // 2. Panen semua yang siap dalam satu request
+        if (readyToHarvest.length > 0) {
+            logger.action('harvest', `Memanen ${readyToHarvest.length} slot secara massal...`);
+            const harvestResult = await api.harvestMultiple(readyToHarvest);
+            if (harvestResult.ok) {
+                const totalCoins = harvestResult.data.plotResults.reduce((sum, p) => sum + (p.coinsEarned || 0), 0);
+                const totalAp = harvestResult.data.plotResults.reduce((sum, p) => sum + (p.apEarned || 0), 0);
+                logger.success(`Panen massal berhasil: +${Math.round(totalCoins)} koin, +${Math.round(totalAp)} AP.`);
+                // Tambahkan slot yang baru dipanen ke daftar slot yang akan ditanam
+                emptySlots.push(...readyToHarvest);
+            } else {
+                logger.error(`Gagal melakukan panen massal: ${harvestResult.error?.message}`);
+            }
+            await sleep(1000); // Jeda setelah panen
+        }
+
+        // 3. Tanam di semua slot yang kosong dalam satu request
+        if (emptySlots.length > 0) {
+            await purchaseItemIfNeeded(bot, 'seed', emptySlots.length);
+
+            logger.action('plant', `Menanam di ${emptySlots.length} slot secara massal...`);
+            const plantings = emptySlots.map(slotIndex => ({ slotIndex, seedKey: bot.config.seedKey }));
+            const plantResult = await api.plantMultiple(plantings);
+
+            if (plantResult.ok) {
+                logger.success(`Berhasil menanam di ${plantResult.data.plotResults.length} slot.`);
+                await sleep(1000); // Jeda setelah tanam
+
+                // 4. Pasang booster satu per satu setelah tanam massal berhasil
+                if (bot.config.boosterKey) {
+                    logger.info(`Memeriksa kebutuhan booster untuk ${emptySlots.length} slot...`);
+                    for (const slotIndex of emptySlots) {
+                        await handleBoosterApplication(bot, slotIndex);
+                        await sleep(500); // Jeda antar pemasangan booster
+                    }
+                }
+            } else {
+                logger.error(`Gagal melakukan penanaman massal: ${plantResult.error?.message}`);
+            }
+        }
+
+        // Setelah siklus selesai, perbarui semua timer
+        await bot.refreshAllTimers();
+
+    } catch (error) {
+        if (error instanceof CaptchaError) return bot.handleCaptchaRequired();
+        if (error instanceof SignatureError) return bot.handleSignatureError();
+        logger.error(`Terjadi error pada siklus batch: ${error.message}`);
+    }
+}
+
 async function purchaseItemIfNeeded(bot, itemType, quantityNeeded = 1) {
     const isSeed = itemType === 'seed';
     const lock = isSeed ? 'isBuyingSeed' : 'isBuyingBooster';
