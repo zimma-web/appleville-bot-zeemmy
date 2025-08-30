@@ -1,16 +1,14 @@
 // =================================================================
 // BOT CORE LOGIC (IMPROVED)
-// Jantung dari bot dengan logika transisi yang lebih baik.
+// Jantung dari bot dengan logika transisi yang lebih baik dan prioritas yang benar.
 // =================================================================
 
 import { logger } from '../utils/logger.js';
 import { api, CaptchaError, SignatureError } from '../services/api.js';
-import { handleBatchCycle, handleHarvest, handleBoosterApplication } from './handlers/actionHandlers.js';
+import { handleBatchCycle, handleHarvest, handlePlanting, handleBoosterApplication } from './handlers/actionHandlers.js';
 import { handleCaptchaRequired, checkPrestigeUpgrade, handleSignatureError } from './handlers/eventHandlers.js';
 import { displayStatus } from './utils/display.js';
-import { BATCH_SETTINGS } from '../config.js'; // Impor konfigurasi batch
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { BATCH_SETTINGS } from '../config.js';
 
 export class Bot {
     constructor(config) {
@@ -19,12 +17,12 @@ export class Bot {
         this.boosterTimers = new Map();
         this.slotStates = new Map();
         this.batchTimer = null;
-        this.transitionTimer = null; // Timer untuk transisi mode
+        this.transitionTimer = null;
         this.isRunning = false;
         this.isPausedForCaptcha = false;
         this.isPausedForSignature = false;
         this.isBatchCycleRunning = false;
-        this.isInTransitionMode = false; // Flag untuk mode transisi
+        this.isInTransitionMode = false;
         this.captchaCheckInterval = null;
         this.statusInterval = null;
         this.prestigeCheckInterval = null;
@@ -32,6 +30,7 @@ export class Bot {
         this.isBuyingSeed = false;
         this.isBuyingBooster = false;
         this.userIdentifier = 'Unknown Account';
+        this.lastCaptchaTimestamp = null;
     }
 
     async start(initialState = null) {
@@ -47,15 +46,11 @@ export class Bot {
             this.userIdentifier = data.user?.rewardWalletAddress || 'Unknown Account';
             this.notifiedPrestigeLevel = data.user?.prestigeLevel || 0;
 
-            await this.handleBatchCycle(data.state);
+            await this.refreshAllTimers(data.state);
 
         } catch (error) {
-            if (error instanceof CaptchaError) {
-                return this.handleCaptchaRequired();
-            }
-            if (error instanceof SignatureError) {
-                return this.handleSignatureError();
-            }
+            if (error instanceof CaptchaError) return this.handleCaptchaRequired();
+            if (error instanceof SignatureError) return this.handleSignatureError();
             logger.error(`Gagal inisialisasi bot: ${error.message}`);
             return this.stop();
         }
@@ -88,96 +83,37 @@ export class Bot {
         this.boosterTimers.clear();
     }
 
-    async refreshAllTimers() {
+    async refreshAllTimers(initialState = null) {
         if (!this.isRunning || this.isPausedForCaptcha || this.isPausedForSignature) return;
         logger.info('Memperbarui semua timer slot...');
         this.clearAllTimers();
 
         try {
-            const { state } = await api.getState();
+            const state = initialState || (await api.getState()).state;
             if (!state) return;
 
             const plots = state.plots.filter(p => this.config.slots.includes(p.slotIndex));
-            let nextBatchHarvestTime = Infinity;
-            let isBatchModeActive = BATCH_SETTINGS.ENABLED_SEEDS.includes(this.config.seedKey);
+            const isBatchModeConfigured = BATCH_SETTINGS.ENABLED_SEEDS.includes(this.config.seedKey);
+            const hasIndividualPlants = plots.some(p => p.seed && !BATCH_SETTINGS.ENABLED_SEEDS.includes(p.seed.key));
 
-            // Periksa apakah ada tanaman lama yang sedang tumbuh
-            const hasOldCrops = plots.some(p =>
-                p.seed &&
-                p.seed.key !== this.config.seedKey &&
-                new Date(p.seed.endsAt).getTime() > Date.now()
-            );
-
-            if (hasOldCrops && isBatchModeActive && !this.isInTransitionMode) {
-                logger.warn('Terdeteksi tanaman lama yang masih tumbuh!');
-                logger.warn('Menggunakan mode individual sambil menunggu tanaman lama selesai...');
-
+            if (hasIndividualPlants && isBatchModeConfigured && !this.isInTransitionMode) {
                 this.isInTransitionMode = true;
+                logger.warn('Mode Transisi: Terdeteksi tanaman individual. Menunggu selesai sebelum beralih ke mode batch.');
 
-                // HANYA atur timer untuk tanaman lama, tidak untuk yang baru
-                for (const slot of plots) {
-                    if (slot.seed && slot.seed.key !== this.config.seedKey) {
-                        const endsAt = new Date(slot.seed.endsAt).getTime();
-                        if (endsAt > Date.now()) {
-                            logger.info(`Slot ${slot.slotIndex}: Menunggu ${slot.seed.key} selesai...`);
-                            this.setHarvestTimer(slot.slotIndex, endsAt);
-                        }
-                    }
+                const individualPlants = plots.filter(p => p.seed && !BATCH_SETTINGS.ENABLED_SEEDS.includes(p.seed.key));
+                if (individualPlants.length > 0) {
+                    let latestHarvestTime = Math.max(...individualPlants.map(p => new Date(p.seed.endsAt).getTime()));
+                    const delay = latestHarvestTime - Date.now() + 2000; //+2 detik buffer
+                    logger.info(`Transisi ke mode batch akan dicoba dalam ${Math.round(delay / 1000)} detik.`);
+                    this.transitionTimer = setTimeout(() => this.refreshAllTimers(), Math.max(1000, delay));
                 }
+                this.runIndividualMode(plots); // Tetap jalankan mode individual selama transisi
 
-                // Mulai proses transisi
-                const oldCrops = plots.filter(p =>
-                    p.seed &&
-                    p.seed.key !== this.config.seedKey &&
-                    new Date(p.seed.endsAt).getTime() > Date.now()
-                );
-
-                if (oldCrops.length > 0) {
-                    let latestOldCropTime = Math.max(...oldCrops.map(p => new Date(p.seed.endsAt).getTime()));
-                    const delayToTransition = latestOldCropTime - Date.now() + 2000;
-
-                    logger.info(`Transisi ke mode batch akan dimulai dalam ${Math.round(delayToTransition / 1000)} detik.`);
-                    this.transitionTimer = setTimeout(() => this.handleTransitionToBatch(), Math.max(1000, delayToTransition));
-                }
-
-            } else if (isBatchModeActive && !this.isInTransitionMode) {
-                // Mode batch murni - TIDAK ADA TIMER INDIVIDUAL
-                logger.info('Mode Batch Aktif');
-
-                // Cari waktu panen terdekat hanya untuk menentukan kapan batch cycle berikutnya
-                for (const slot of plots) {
-                    if (slot.seed && this.config.seedKey === slot.seed.key) {
-                        const endsAt = new Date(slot.seed.endsAt).getTime();
-                        if (endsAt < nextBatchHarvestTime) {
-                            nextBatchHarvestTime = endsAt;
-                        }
-                    }
-                }
-
-                if (nextBatchHarvestTime !== Infinity) {
-                    const duration = nextBatchHarvestTime - Date.now();
-                    logger.info(`Mode Batch: Siklus berikutnya dalam ${Math.max(0, Math.round(duration / 1000))} detik.`);
-                    this.batchTimer = setTimeout(() => this.handleBatchCycle(), Math.max(0, duration) + 1000);
-                } else {
-                    // Tidak ada tanaman batch, jalankan sekarang
-                    logger.info('Mode Batch: Memulai siklus batch...');
-                    setTimeout(() => this.handleBatchCycle(), 1000);
-                }
+            } else if (isBatchModeConfigured && !this.isInTransitionMode) {
+                this.runBatchMode(plots);
             } else {
-                // Mode Individual penuh
-                logger.info('Mode Individual: Mengatur timer untuk setiap slot.');
-                for (const slot of plots) {
-                    if (slot.seed) {
-                        this.setHarvestTimer(slot.slotIndex, new Date(slot.seed.endsAt).getTime());
-                    }
-                }
-            }
-
-            // Selalu atur timer untuk booster secara individual
-            for (const slot of plots) {
-                if (slot.modifier) {
-                    this.setBoosterTimer(slot.slotIndex, new Date(slot.modifier.endsAt).getTime());
-                }
+                this.isInTransitionMode = false; // Pastikan transisi selesai jika tidak ada lagi tanaman individual
+                this.runIndividualMode(plots);
             }
 
         } catch (error) {
@@ -185,55 +121,55 @@ export class Bot {
         }
     }
 
-    /**
-     * Fungsi khusus untuk transisi ke batch mode
-     */
-    async handleTransitionToBatch() {
-        if (!this.isRunning || this.isPausedForCaptcha || this.isPausedForSignature) return;
+    runBatchMode(plots) {
+        logger.info('Mode Batch: Mengatur siklus batch berikutnya.');
+        let nextBatchHarvestTime = Infinity;
+        let allSlotsEmpty = true;
 
-        try {
-            logger.info('Memeriksa apakah siap untuk beralih ke mode batch...');
-            const { state } = await api.getState();
-            if (!state) return;
-
-            const plots = state.plots.filter(p => this.config.slots.includes(p.slotIndex));
-
-            // Periksa apakah masih ada tanaman lama
-            const hasOldCrops = plots.some(p =>
-                p.seed &&
-                p.seed.key !== this.config.seedKey &&
-                new Date(p.seed.endsAt).getTime() > Date.now()
-            );
-
-            if (hasOldCrops) {
-                // Masih ada tanaman lama, tunggu lagi
-                logger.warn('Masih ada tanaman lama yang belum siap dipanen. Menunggu...');
-                const oldCrops = plots.filter(p =>
-                    p.seed &&
-                    p.seed.key !== this.config.seedKey &&
-                    new Date(p.seed.endsAt).getTime() > Date.now()
-                );
-
-                let nextCheckTime = Math.min(...oldCrops.map(p => new Date(p.seed.endsAt).getTime()));
-                const delay = nextCheckTime - Date.now() + 1000;
-
-                this.transitionTimer = setTimeout(() => this.handleTransitionToBatch(), Math.max(1000, delay));
-                return;
+        for (const slot of plots) {
+            if (slot.seed) {
+                allSlotsEmpty = false;
+                const endsAt = new Date(slot.seed.endsAt).getTime();
+                if (endsAt < nextBatchHarvestTime) {
+                    nextBatchHarvestTime = endsAt;
+                }
             }
+        }
 
-            // Semua tanaman lama sudah selesai, beralih ke mode batch
-            logger.success('Semua tanaman lama telah dipanen. Memulai mode batch!');
-            this.isInTransitionMode = false;
+        if (allSlotsEmpty) {
+            this.handleBatchCycle();
+        } else {
+            const duration = nextBatchHarvestTime - Date.now();
+            this.batchTimer = setTimeout(() => this.handleBatchCycle(), Math.max(0, duration) + 1000);
+        }
+    }
 
-            // Clear semua timer individual dan refresh untuk mode batch
-            this.clearAllTimers();
+    runIndividualMode(plots) {
+        if (!this.isInTransitionMode) logger.info('Mode Individual: Mengatur timer untuk setiap slot.');
+        const now = Date.now();
 
-            // Langsung jalankan batch cycle
-            setTimeout(() => this.handleBatchCycle(), 500);
+        for (const slot of plots) {
+            const slotIndex = slot.slotIndex;
 
-        } catch (error) {
-            logger.error(`Error dalam transisi ke batch: ${error.message}`);
-            this.transitionTimer = setTimeout(() => this.handleTransitionToBatch(), 5000);
+            if (slot.seed && this.config.boosterKey && !slot.modifier) {
+                // Prioritas 1: Ada Tanaman, tapi Booster Hilang/Habis
+                this.handleBoosterApplication(slotIndex);
+                this.setHarvestTimer(slotIndex, new Date(slot.seed.endsAt).getTime());
+            } else if (slot.seed && new Date(slot.seed.endsAt).getTime() <= now) {
+                // Prioritas 2: Siap Panen
+                this.handleHarvest(slotIndex);
+            } else if (!slot.seed) {
+                // Prioritas 3: Slot Kosong
+                this.handlePlanting(slotIndex);
+            } else {
+                // Kondisi Normal: Cukup atur timer
+                if (slot.seed) {
+                    this.setHarvestTimer(slotIndex, new Date(slot.seed.endsAt).getTime());
+                }
+                if (slot.modifier) {
+                    this.setBoosterTimer(slotIndex, new Date(slot.modifier.endsAt).getTime());
+                }
+            }
         }
     }
 
@@ -261,12 +197,17 @@ export class Bot {
         this.boosterTimers.set(slotIndex, timer);
     }
 
+    // --- Pemanggil Handler ---
     handleBatchCycle(initialState = null) {
         handleBatchCycle(this, initialState);
     }
 
     handleHarvest(slotIndex) {
         handleHarvest(this, slotIndex);
+    }
+
+    handlePlanting(slotIndex) {
+        handlePlanting(this, slotIndex);
     }
 
     handleBoosterApplication(slotIndex) {
@@ -289,3 +230,4 @@ export class Bot {
         displayStatus(this);
     }
 }
+

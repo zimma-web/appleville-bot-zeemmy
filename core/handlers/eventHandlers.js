@@ -24,6 +24,21 @@ export async function handleCaptchaRequired(bot) {
     logger.error('CAPTCHA DIBUTUHKAN. Bot dijeda.');
     logger.info('Silakan selesaikan CAPTCHA di browser. Bot akan mencoba lagi secara otomatis.');
 
+    // [LOGIKA BARU] Ambil dan simpan timestamp CAPTCHA saat ini sebagai acuan.
+    try {
+        const { user } = await api.getState();
+        if (user && user.lastCaptchaAt) {
+            bot.lastCaptchaTimestamp = user.lastCaptchaAt;
+            logger.info(`Timestamp CAPTCHA awal disimpan: ${bot.lastCaptchaTimestamp}`);
+        } else {
+            // Jika gagal mendapatkan timestamp, gunakan null sebagai fallback
+            bot.lastCaptchaTimestamp = null;
+        }
+    } catch (e) {
+        logger.warn('Gagal mendapatkan timestamp CAPTCHA awal.');
+        bot.lastCaptchaTimestamp = null;
+    }
+
     const message = `🚨 *CAPTCHA Dibutuhkan!* 🚨\n\nAkun: \`${bot.userIdentifier}\`\n\nBot AppleVille dijeda. Mohon selesaikan CAPTCHA di browser.`;
     await sendTelegramMessage(message);
 
@@ -41,11 +56,11 @@ async function checkForCaptchaResolution(bot) {
     logger.info('Mencoba memeriksa status CAPTCHA...');
     try {
         const response = await api.getState();
+        const newTimestamp = response.user?.lastCaptchaAt;
 
-        // [PERBAIKAN] Pengecekan yang lebih kuat. Tidak hanya 'ok', tapi juga validitas data.
-        // Memastikan ada data pengguna yang valid adalah bukti bahwa CAPTCHA benar-benar selesai.
-        if (response.ok && response.user && response.user.rewardWalletAddress) {
-            logger.success('CAPTCHA sepertinya sudah diselesaikan!');
+
+        if (response.ok && newTimestamp && newTimestamp !== bot.lastCaptchaTimestamp) {
+            logger.success('CAPTCHA sepertinya sudah diselesaikan! Timestamp telah berubah.');
 
             const message = `✅ *CAPTCHA Selesai!* ✅\n\nAkun: \`${bot.userIdentifier}\`\n\nBot AppleVille akan melanjutkan operasi.`;
             await sendTelegramMessage(message);
@@ -53,15 +68,14 @@ async function checkForCaptchaResolution(bot) {
             clearInterval(bot.captchaCheckInterval);
             bot.captchaCheckInterval = null;
             bot.isPausedForCaptcha = false;
-            await bot.initializeSlots(response.state);
+
+            await bot.refreshAllTimers(response.state);
         } else {
-            // Ini menangani kasus di mana server mengirim status 'ok' tapi datanya kosong/tidak valid.
-            logger.warn('CAPTCHA masih aktif (respons tidak valid). Mencoba lagi nanti...');
+            logger.warn('CAPTCHA masih aktif (timestamp belum berubah). Mencoba lagi nanti...');
         }
     } catch (error) {
         if (error instanceof CaptchaError) {
-            // Ini menangani kasus di mana API secara eksplisit melempar CaptchaError.
-            logger.warn('CAPTCHA masih aktif (error terdeteksi). Mencoba lagi nanti...');
+            logger.warn('CAPTCHA masih aktif (API mengembalikan error CAPTCHA). Mencoba lagi nanti...');
         } else {
             logger.error(`Terjadi error saat memeriksa CAPTCHA: ${error.message}`);
         }
@@ -124,13 +138,13 @@ export async function handleSignatureError(bot) {
         );
 
         bot.isPausedForSignature = false;
-        await bot.initializeSlots(response.state);
+        await bot.refreshAllTimers(response.state);
 
     } catch (error) {
         logger.error(`Perbaikan signature otomatis GAGAL: ${error.message}`);
         await sendTelegramMessage(
             `❌ *Perbaikan Signature Gagal!* ❌\n\nAkun: \`${bot.userIdentifier}\`\n\nBot tidak dapat memperbaiki masalah secara otomatis. Bot akan berhenti. Mohon periksa log.`
-        );
+        )
         bot.stop();
     }
 }
