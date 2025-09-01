@@ -132,12 +132,51 @@ async function validateSignatureConfig() {
         const module = await import(`${configPath}?v=${Date.now()}`);
         const { SIGNATURE_PATTERN, KEY_PARTS, HEADER_NAMES } = module;
 
-        if (!SIGNATURE_PATTERN || SIGNATURE_PATTERN.length === 0) return false;
-        if (!KEY_PARTS || KEY_PARTS.length === 0) return false;
-        if (!HEADER_NAMES || !HEADER_NAMES.META_HASH) return false;
+        // Validasi SIGNATURE_PATTERN
+        if (!SIGNATURE_PATTERN || !Array.isArray(SIGNATURE_PATTERN) || SIGNATURE_PATTERN.length === 0) {
+            logger.debug('SIGNATURE_PATTERN tidak valid atau kosong');
+            return false;
+        }
 
+        // Validasi KEY_PARTS
+        if (!KEY_PARTS || !Array.isArray(KEY_PARTS) || KEY_PARTS.length === 0) {
+            logger.debug('KEY_PARTS tidak valid atau kosong');
+            return false;
+        }
+
+        // Validasi HEADER_NAMES - tidak lagi mencari kunci spesifik
+        if (!HEADER_NAMES || typeof HEADER_NAMES !== 'object') {
+            logger.debug('HEADER_NAMES tidak valid');
+            return false;
+        }
+
+        // Pastikan HEADER_NAMES memiliki minimal 3 kunci (untuk hash, time, trace)
+        const headerKeys = Object.keys(HEADER_NAMES);
+        if (headerKeys.length < 3) {
+            logger.debug(`HEADER_NAMES hanya memiliki ${headerKeys.length} kunci, diperlukan minimal 3`);
+            return false;
+        }
+
+        // Validasi bahwa semua nilai header adalah string dan tidak kosong
+        for (const [key, value] of Object.entries(HEADER_NAMES)) {
+            if (typeof value !== 'string' || value.trim() === '') {
+                logger.debug(`Header ${key} memiliki nilai tidak valid: ${value}`);
+                return false;
+            }
+        }
+
+        // Validasi bahwa SIGNATURE_PATTERN index tidak melebihi KEY_PARTS length
+        const maxIndex = Math.max(...SIGNATURE_PATTERN);
+        if (maxIndex >= KEY_PARTS.length) {
+            logger.debug(`SIGNATURE_PATTERN index ${maxIndex} melebihi KEY_PARTS length ${KEY_PARTS.length}`);
+            return false;
+        }
+
+        logger.debug(`Konfigurasi signature valid: Pattern(${SIGNATURE_PATTERN.length}), Keys(${KEY_PARTS.length}), Headers(${headerKeys.join(', ')})`);
         return true;
+
     } catch (error) {
+        logger.debug(`Error saat memvalidasi signature config: ${error.message}`);
         return false;
     }
 }

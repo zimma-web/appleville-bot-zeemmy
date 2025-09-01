@@ -128,6 +128,9 @@ async function trpcPost(path, payload) {
             ...(await mutationHeaders(sigPayload)),
         };
 
+        logger.debug(`Headers for POST ${path}:\n${JSON.stringify(headers, null, 2)}`);
+
+
         const res = await fetchWithRetry(url, {
             method: 'POST',
             headers,

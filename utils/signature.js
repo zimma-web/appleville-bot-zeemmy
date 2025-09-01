@@ -92,7 +92,7 @@ function generateNonce() {
 export async function mutationHeaders(payload) {
     try {
         const { HEADER_NAMES } = signatureConfig;
-        if (!HEADER_NAMES || !HEADER_NAMES.META_HASH) {
+        if (!HEADER_NAMES || Object.keys(HEADER_NAMES).length === 0) {
             logger.warn('Konfigurasi signature tidak lengkap. Melewatkan pembuatan signature.');
             return {};
         }
@@ -110,13 +110,25 @@ export async function mutationHeaders(payload) {
 
         const signature = await createHmacSignature(secretKey, message);
 
+        // ✅ PERBAIKAN: Mengambil NILAI header (bukan kunci) secara dinamis
+        const headerNames = Object.values(HEADER_NAMES);
+
+        // Pastikan ada minimal 3 header (untuk hash, time, dan trace)
+        if (headerNames.length < 3) {
+            logger.warn('Jumlah header tidak mencukupi. Diperlukan minimal 3 header.');
+            return {};
+        }
+
+        // Buat headers secara dinamis berdasarkan urutan nilai dari config
+        // Asumsi: nilai pertama untuk signature, kedua untuk timestamp, ketiga untuk nonce
         const headers = {
-            [HEADER_NAMES.META_HASH]: signature,
-            [HEADER_NAMES.CLIENT_TIME]: timestamp.toString(),
-            [HEADER_NAMES.TRACE_ID]: nonce,
+            [headerNames[0]]: signature,             // Akan menjadi -> "09d": "..."
+            [headerNames[1]]: timestamp.toString(),  // Akan menjadi -> "xcsad23": "..."
+            [headerNames[2]]: nonce                  // Akan menjadi -> "aaa-3bsv": "..."
         };
 
-        logger.debug(`Headers generated for path with payload: ${JSON.stringify(payload)}`);
+        logger.debug(`Headers generated with names: ${headerNames.join(', ')}`);
+        logger.debug(`Headers generated for payload: ${JSON.stringify(payload)}`);
         return headers;
     } catch (error) {
         logger.error('[ERROR] Gagal membuat signature headers:', error);

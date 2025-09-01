@@ -9,9 +9,9 @@
  */
 export const DEFAULT_SETTINGS = {
     SLOTS: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    SEED: 'ascendant-apple',
+    SEED: 'apex-apple',
     BUY_QTY_SEED: 12,
-    BOOSTER: 'warp-time-elixir',
+    BOOSTER: 'apex-potion',
     BUY_QTY_BOOSTER: 12,
     AUTO_REFRESH_BOOSTER: true,
     DEBUG_MODE: false, // Ubah ke true untuk mengaktifkan debug.
