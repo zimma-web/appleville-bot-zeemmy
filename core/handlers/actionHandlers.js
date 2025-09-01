@@ -132,6 +132,8 @@ export async function handleBatchCycle(bot, initialState = null) {
     }
 }
 
+// file: core/handlers/actionHandlers.js
+
 export async function handleHarvest(bot, slotIndex) {
     if (!bot.isRunning || bot.isPausedForCaptcha || bot.isPausedForSignature) return;
     bot.plantTimers.delete(slotIndex);
@@ -146,8 +148,17 @@ export async function handleHarvest(bot, slotIndex) {
                 const ap = Math.round(earnings.apEarned || 0);
                 const xp = Math.round(earnings.xpGained || 0);
                 logger.success(`Slot ${slotIndex} dipanen: +${coins} koin, +${ap} AP, +${xp} XP.`);
+
+                // ==========================================================
+                // >> PERUBAHAN UTAMA <<
+                // Jangan panggil handlePlanting di sini.
+                // Biarkan refreshAllTimers yang mengatur ulang logika untuk slot ini.
+                // Ini mencegah panggilan tanam ganda.
+                // ==========================================================
                 await sleep(500);
-                await handlePlanting(bot, slotIndex);
+                bot.refreshAllTimers(); // Memanggil refresh untuk re-evaluasi semua slot
+                // ==========================================================
+
                 return; // Sukses, keluar dari loop
             }
             throw new Error(result.error?.message || 'Unknown harvest error');
@@ -156,7 +167,10 @@ export async function handleHarvest(bot, slotIndex) {
             if (error instanceof SignatureError) return bot.handleSignatureError();
             logger.error(`Gagal memanen slot ${slotIndex}: ${error.message}. Mencoba lagi... (${attempt}/3)`);
             if (attempt < 3) await sleep(5000);
-            else logger.error(`Gagal total memanen slot ${slotIndex} setelah 3 percobaan.`);
+            else {
+                logger.error(`Gagal total memanen slot ${slotIndex} setelah 3 percobaan.`);
+                bot.refreshAllTimers(); // Refresh bahkan jika gagal total
+            }
         }
     }
 }
