@@ -23,8 +23,13 @@ export const DEFAULT_SETTINGS = {
 export const API_SETTINGS = {
     BASE_URL: 'https://app.appleville.xyz/api/trpc',
     MAX_RETRIES: 3,
-    RETRY_DELAY: 2000, // dalam milidetik
-    PAUSE_MS: 150, // jeda singkat antar panggilan API
+    RETRY_DELAY: 1000, // dalam milidetik (dikurangi dari 2000ms ke 1000ms)
+    PAUSE_MS: 300, // jeda antar panggilan API (dikurangi dari 1000ms ke 300ms)
+    BATCH_DELAY: 500, // jeda antar operasi batch (dikurangi dari 2000ms ke 500ms)
+    HARVEST_DELAY: 400, // jeda antar panen (dikurangi dari 1500ms ke 400ms)
+    PLANT_DELAY: 300, // jeda antar tanam (dikurangi dari 1200ms ke 300ms)
+    BOOSTER_DELAY: 400, // jeda antar pemasangan booster (dikurangi dari 1400ms ke 400ms)
+    MAX_CONCURRENT_REQUESTS: 2, // maksimal request bersamaan (ditingkatkan dari 1 ke 2)
 };
 
 /**

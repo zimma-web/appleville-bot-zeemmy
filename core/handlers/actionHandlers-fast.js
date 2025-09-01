@@ -1,12 +1,11 @@
 // =================================================================
-// ACTION HANDLERS - ULTRA RESPONSIVE BATCH MODE
-// Logika untuk aksi bot: BATCH PROCESSING 100% RESPONSIF - SLOT TIDAK BOLEH TURUN
+// ACTION HANDLERS - FAST BATCH MODE
+// Logika untuk aksi bot: BATCH PROCESSING CEPAT dengan delay minimal
 // =================================================================
 
 import { logger } from '../../utils/logger.js';
 import { api, CaptchaError, SignatureError } from '../../services/api.js';
 import { BATCH_SETTINGS, API_SETTINGS } from '../../config.js';
-import { sendTelegramMessage } from '../../utils/telegram.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -15,7 +14,7 @@ function inventoryCount(state, key) {
     return item?.quantity || 0;
 }
 
-// [ULTRA RESPONSIVE] Fungsi ini sekarang lebih tangguh terhadap race condition
+// [OPTIMIZED] Fungsi ini sekarang lebih tangguh terhadap race condition
 async function purchaseItemIfNeeded(bot, itemType, quantityNeeded = 1) {
     const isSeed = itemType === 'seed';
     const lock = isSeed ? 'isBuyingSeed' : 'isBuyingBooster';
@@ -56,7 +55,7 @@ async function purchaseItemIfNeeded(bot, itemType, quantityNeeded = 1) {
     }
 }
 
-// [ULTRA RESPONSIVE] Fungsi untuk memproses batch dengan kecepatan maksimal
+// [FAST] Fungsi untuk memproses batch dengan kecepatan maksimal
 async function processBatchInChunks(bot, items, processFunction, batchSize = 8, delay = API_SETTINGS.BATCH_DELAY) {
     const results = [];
     for (let i = 0; i < items.length; i += batchSize) {
@@ -79,7 +78,7 @@ async function processBatchInChunks(bot, items, processFunction, batchSize = 8, 
     return results;
 }
 
-// [ULTRA RESPONSIVE] Fungsi untuk menampilkan informasi akun singkat dan kirim ke Telegram
+// [OPTIMIZED] Fungsi untuk menampilkan informasi akun singkat
 async function displayAccountInfo(bot) {
     try {
         const { user, state } = await api.getState();
@@ -90,7 +89,6 @@ async function displayAccountInfo(bot) {
         const emptyPlots = plots.filter(p => !p.seed);
         const readyToHarvest = plots.filter(p => p.seed && new Date(p.seed.endsAt).getTime() <= Date.now());
 
-        // Info untuk console
         logger.info('=== INFORMASI AKUN ===');
         logger.info(`💰 Saldo: ${user.coins || 0} koin | ${user.ap || 0} AP`);
         logger.info(`🌱 Slot Aktif: ${activePlots.length}/${plots.length} | 📦 Kosong: ${emptyPlots.length} | 🔪 Siap: ${readyToHarvest.length}`);
@@ -100,38 +98,15 @@ async function displayAccountInfo(bot) {
         logger.info(`🌾 Stok ${bot.config.seedKey}: ${seedCount}`);
         
         // Next harvest time
-        let nextHarvestTime = 'Tidak ada';
         if (activePlots.length > 0) {
             const nextHarvest = Math.min(...activePlots.map(p => new Date(p.seed.endsAt).getTime()));
             const timeUntilHarvest = Math.max(0, nextHarvest - Date.now());
             const minutes = Math.floor(timeUntilHarvest / 60000);
             const seconds = Math.floor((timeUntilHarvest % 60000) / 1000);
-            nextHarvestTime = `${minutes}m ${seconds}s`;
-            logger.info(`⏰ Panen berikutnya: ${nextHarvestTime}`);
+            logger.info(`⏰ Panen berikutnya: ${minutes}m ${seconds}s`);
         }
         
         logger.info('=====================');
-
-        // [BARU] Kirim notifikasi ke Telegram
-        const telegramMessage = `🌾 *BATCH CYCLE SELESAI* 🌾
-
-💰 *Saldo Akun:*
-• Koin: ${user.coins || 0}
-• AP: ${user.ap || 0}
-
-🌱 *Status Slot:*
-• Aktif: ${activePlots.length}/${plots.length}
-• Kosong: ${emptyPlots.length}
-• Siap Panen: ${readyToHarvest.length}
-
-🌾 *Inventory:*
-• ${bot.config.seedKey}: ${seedCount}
-
-⏰ *Panen Berikutnya:* ${nextHarvestTime}
-
-🔄 *Waktu:* ${new Date().toLocaleString('id-ID')}`;
-
-        await sendTelegramMessage(telegramMessage);
         
     } catch (error) {
         logger.warn(`Gagal mendapatkan informasi akun: ${error.message}`);
@@ -142,7 +117,7 @@ export async function handleBatchCycle(bot, initialState = null) {
     if (!bot.isRunning || bot.isPausedForCaptcha || bot.isPausedForSignature || bot.isBatchCycleRunning) return;
 
     bot.isBatchCycleRunning = true;
-    logger.info('🚀 Memulai siklus batch processing ULTRA RESPONSIF...');
+    logger.info('🚀 Memulai siklus batch processing...');
 
     try {
         const state = initialState || (await api.getState()).state;
@@ -150,57 +125,15 @@ export async function handleBatchCycle(bot, initialState = null) {
 
         const now = Date.now();
         const plots = state.plots.filter(p => bot.config.slots.includes(p.slotIndex));
-        const targetSlotCount = bot.config.slots.length; // Target: 12 slot
 
-        logger.info(`📊 Status: ${plots.filter(p => p.seed).length} aktif, ${plots.filter(p => !p.seed).length} kosong | Target: ${targetSlotCount} slot aktif`);
+        logger.info(`📊 Status: ${plots.filter(p => p.seed).length} aktif, ${plots.filter(p => !p.seed).length} kosong`);
 
-        // [ULTRA RESPONSIVE BATCH MODE] URUTAN: PANEN → TANAM → VERIFIKASI SLOT
+        // [FAST BATCH MODE] URUTAN: TANAM → PANEN → BOOSTER
         
-        // 1. PANEN SEMUA SLOT YANG SIAP SECEPATNYA
-        const readyToHarvest = plots.filter(p => p.seed && new Date(p.seed.endsAt).getTime() <= now);
-        
-        if (readyToHarvest.length > 0) {
-            logger.action('harvest', `🔪 Memanen ${readyToHarvest.length} slot...`);
-            
-            const harvestResults = await processBatchInChunks(
-                bot,
-                readyToHarvest.map(p => p.slotIndex),
-                async (slotIndex) => {
-                    try {
-                        const { state: currentState } = await api.getState();
-                        const currentPlot = currentState.plots.find(p => p.slotIndex === slotIndex);
-                        
-                        if (!currentPlot || !currentPlot.seed) {
-                            return { slotIndex, success: true, skipped: true, reason: 'No plant' };
-                        }
-                        
-                        if (new Date(currentPlot.seed.endsAt).getTime() > now) {
-                            return { slotIndex, success: true, skipped: true, reason: 'Not ready' };
-                        }
-                        
-                        const result = await api.harvestSlot(slotIndex);
-                        return { slotIndex, success: result.ok, data: result.data, skipped: false };
-                    } catch (error) {
-                        return { slotIndex, success: false, error: error.message, skipped: false };
-                    }
-                },
-                8, // Batch size besar untuk kecepatan
-                API_SETTINGS.BATCH_DELAY
-            );
-            
-            const successfulHarvests = harvestResults.filter(r => r.success && !r.skipped);
-            if (successfulHarvests.length > 0) {
-                logger.success(`✅ Berhasil memanen ${successfulHarvests.length} slot.`);
-            }
-        }
-
-        // 2. [ULTRA RESPONSIVE] TANAM SEMUA SLOT KOSONG UNTUK MEMPERTAHANKAN 12 SLOT AKTIF
-        const stateAfterHarvest = (await api.getState()).state;
-        const plotsAfterHarvest = stateAfterHarvest.plots.filter(p => bot.config.slots.includes(p.slotIndex));
-        const emptySlots = plotsAfterHarvest.filter(p => !p.seed);
-        
+        // 1. TANAM SEMUA SLOT KOSONG SECEPATNYA
+        const emptySlots = plots.filter(p => !p.seed);
         if (emptySlots.length > 0) {
-            logger.action('plant', `🌱 [ULTRA RESPONSIVE] Menanam di ${emptySlots.length} slot kosong untuk mempertahankan ${targetSlotCount} slot aktif...`);
+            logger.action('plant', `🌱 Menanam di ${emptySlots.length} slot kosong...`);
             
             await purchaseItemIfNeeded(bot, 'seed', emptySlots.length);
             
@@ -237,64 +170,53 @@ export async function handleBatchCycle(bot, initialState = null) {
             }
         }
 
-        // 3. [ULTRA RESPONSIVE] VERIFIKASI DAN PERBAIKI SLOT YANG KOSONG
-        const finalState = (await api.getState()).state;
-        const finalPlots = finalState.plots.filter(p => bot.config.slots.includes(p.slotIndex));
-        const finalActiveSlots = finalPlots.filter(p => p.seed);
-        const finalEmptySlots = finalPlots.filter(p => !p.seed);
+        // 2. PANEN SEMUA SLOT YANG SIAP SECEPATNYA
+        const stateAfterPlanting = (await api.getState()).state;
+        const plotsAfterPlanting = stateAfterPlanting.plots.filter(p => bot.config.slots.includes(p.slotIndex));
+        const readyToHarvest = plotsAfterPlanting.filter(p => p.seed && new Date(p.seed.endsAt).getTime() <= now);
         
-        // Jika masih ada slot kosong, tanam lagi sampai 12 slot aktif
-        if (finalEmptySlots.length > 0) {
-            logger.warn(`⚠️ [ULTRA RESPONSIVE] Masih ada ${finalEmptySlots.length} slot kosong! Menanam lagi...`);
+        if (readyToHarvest.length > 0) {
+            logger.action('harvest', `🔪 Memanen ${readyToHarvest.length} slot...`);
             
-            await purchaseItemIfNeeded(bot, 'seed', finalEmptySlots.length);
-            
-            const finalPlantResults = await processBatchInChunks(
+            const harvestResults = await processBatchInChunks(
                 bot,
-                finalEmptySlots.map(p => ({ slotIndex: p.slotIndex, seedKey: bot.config.seedKey })),
-                async (planting) => {
+                readyToHarvest.map(p => p.slotIndex),
+                async (slotIndex) => {
                     try {
                         const { state: currentState } = await api.getState();
-                        const currentPlot = currentState.plots.find(p => p.slotIndex === planting.slotIndex);
+                        const currentPlot = currentState.plots.find(p => p.slotIndex === slotIndex);
                         
-                        if (currentPlot && currentPlot.seed) {
-                            return { slotIndex: planting.slotIndex, success: true, skipped: true, reason: 'Already planted' };
+                        if (!currentPlot || !currentPlot.seed) {
+                            return { slotIndex, success: true, skipped: true, reason: 'No plant' };
                         }
                         
-                        const result = await api.plantSeed(planting.slotIndex, planting.seedKey);
-                        return { slotIndex: planting.slotIndex, success: result.ok, data: result.data, skipped: false };
+                        if (new Date(currentPlot.seed.endsAt).getTime() > now) {
+                            return { slotIndex, success: true, skipped: true, reason: 'Not ready' };
+                        }
+                        
+                        const result = await api.harvestSlot(slotIndex);
+                        return { slotIndex, success: result.ok, data: result.data, skipped: false };
                     } catch (error) {
-                        return { slotIndex: planting.slotIndex, success: false, error: error.message, skipped: false };
+                        return { slotIndex, success: false, error: error.message, skipped: false };
                     }
                 },
                 8, // Batch size besar untuk kecepatan
                 API_SETTINGS.BATCH_DELAY
             );
             
-            const finalSuccessfulPlants = finalPlantResults.filter(r => r.success && !r.skipped);
-            if (finalSuccessfulPlants.length > 0) {
-                logger.success(`✅ [ULTRA RESPONSIVE] Berhasil menanam final di ${finalSuccessfulPlants.length} slot.`);
+            const successfulHarvests = harvestResults.filter(r => r.success && !r.skipped);
+            if (successfulHarvests.length > 0) {
+                logger.success(`✅ Berhasil memanen ${successfulHarvests.length} slot.`);
             }
         }
 
-        // 4. BOOSTER (OPSIONAL) - DILEWATI UNTUK KECEPATAN
+        // 3. BOOSTER (OPSIONAL) - DILEWATI UNTUK KECEPATAN
         if (bot.config.boosterKey) {
             logger.info(`⚡ Booster dilewati untuk kecepatan batch processing.`);
         }
 
-        // [ULTRA RESPONSIVE] Tampilkan info akun singkat
+        // [FAST] Tampilkan info akun singkat
         await displayAccountInfo(bot);
-
-        // 5. [ULTRA RESPONSIVE] VERIFIKASI FINAL - PASTIKAN 12 SLOT AKTIF
-        const verificationState = (await api.getState()).state;
-        const verificationPlots = verificationState.plots.filter(p => bot.config.slots.includes(p.slotIndex));
-        const verificationActiveSlots = verificationPlots.filter(p => p.seed);
-        
-        if (verificationActiveSlots.length === targetSlotCount) {
-            logger.success(`🎯 [ULTRA RESPONSIVE] VERIFIKASI BERHASIL: ${verificationActiveSlots.length}/${targetSlotCount} slot aktif!`);
-        } else {
-            logger.error(`❌ [ULTRA RESPONSIVE] VERIFIKASI GAGAL: ${verificationActiveSlots.length}/${targetSlotCount} slot aktif!`);
-        }
 
     } catch (error) {
         if (error instanceof CaptchaError) return bot.handleCaptchaRequired();
@@ -302,7 +224,7 @@ export async function handleBatchCycle(bot, initialState = null) {
         logger.error(`❌ Error batch: ${error.message}`);
     } finally {
         bot.isBatchCycleRunning = false;
-        logger.info(`🔄 Batch cycle ULTRA RESPONSIF selesai!`);
+        logger.info(`🔄 Batch cycle selesai!`);
         bot.refreshAllTimers();
     }
 }

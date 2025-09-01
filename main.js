@@ -249,15 +249,29 @@ async function start() {
 
         // Menampilkan daftar bibit yang sesuai dengan level prestige
         console.log('\n--- Bibit Tersedia ---');
-        Object.entries(SEEDS)
-            .filter(([key, seedData]) => !seedData.prestige || seedData.prestige <= userPrestigeLevel)
-            .forEach(([key, seedData]) => {
-                const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
-                const prestigeInfo = seedData.prestige ? ` (Prestige: ${seedData.prestige})` : '';
-                const rewardInfo = seedData.reward ? `| Reward: ${seedData.rewardCurrency === 'coins' ? '🪙' : '🍎'} ${seedData.reward}` : '';
-                console.log(`- ${key.padEnd(18, ' ')} ${growTime.padEnd(10, ' ')} ${rewardInfo} ${prestigeInfo}`);
-            });
-        const seedKey = (await askQuestion(`\nPilih bibit [default: ${DEFAULT_SETTINGS.SEED}]: `) || DEFAULT_SETTINGS.SEED).toLowerCase();
+        const availableSeeds = Object.entries(SEEDS)
+            .filter(([key, seedData]) => !seedData.prestige || seedData.prestige <= userPrestigeLevel);
+        
+        availableSeeds.forEach(([key, seedData], index) => {
+            const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
+            const prestigeInfo = seedData.prestige ? ` (Prestige: ${seedData.prestige})` : '';
+            const rewardInfo = seedData.reward ? `| Reward: ${seedData.rewardCurrency === 'coins' ? '🪙' : '🍎'} ${seedData.reward}` : '';
+            console.log(`${index + 1}. ${key.padEnd(18, ' ')} ${growTime.padEnd(10, ' ')} ${rewardInfo} ${prestigeInfo}`);
+        });
+        
+        const seedIndex = await askQuestion(`\nPilih bibit dengan nomor [1-${availableSeeds.length}] [default: ${DEFAULT_SETTINGS.SEED}]: `);
+        let seedKey;
+        if (seedIndex && !isNaN(parseInt(seedIndex))) {
+            const selectedIndex = parseInt(seedIndex) - 1;
+            if (selectedIndex >= 0 && selectedIndex < availableSeeds.length) {
+                seedKey = availableSeeds[selectedIndex][0];
+            } else {
+                seedKey = DEFAULT_SETTINGS.SEED;
+            }
+        } else {
+            seedKey = DEFAULT_SETTINGS.SEED;
+        }
+        
         if (!SEEDS[seedKey]) {
             logger.error(`Bibit '${seedKey}' tidak dikenal.`);
             process.exit(1);
@@ -265,15 +279,31 @@ async function start() {
 
         // Menampilkan daftar booster yang sesuai dengan level prestige
         console.log('\n--- Booster Tersedia ---');
-        Object.entries(BOOSTERS)
-            .filter(([key, boosterData]) => !boosterData.prestige || boosterData.prestige <= userPrestigeLevel)
-            .forEach(([key, boosterData]) => {
-                const prestigeInfo = boosterData.prestige ? `(Prestige: ${boosterData.prestige})` : '';
-                const effectInfo = boosterData.effect ? `| ${boosterData.effect}` : '';
-                console.log(`- ${key.padEnd(20, ' ')} ${effectInfo} ${prestigeInfo}`);
-            });
-        console.log(`- none`);
-        const boosterKey = (await askQuestion(`\nPilih booster (ketik 'none' untuk tanpa booster) [default: ${DEFAULT_SETTINGS.BOOSTER}]: `) || DEFAULT_SETTINGS.BOOSTER).toLowerCase();
+        const availableBoosters = Object.entries(BOOSTERS)
+            .filter(([key, boosterData]) => !boosterData.prestige || boosterData.prestige <= userPrestigeLevel);
+        
+        availableBoosters.forEach(([key, boosterData], index) => {
+            const prestigeInfo = boosterData.prestige ? `(Prestige: ${boosterData.prestige})` : '';
+            const effectInfo = boosterData.effect ? `| ${boosterData.effect}` : '';
+            console.log(`${index + 1}. ${key.padEnd(20, ' ')} ${effectInfo} ${prestigeInfo}`);
+        });
+        console.log(`${availableBoosters.length + 1}. none`);
+        
+        const boosterIndex = await askQuestion(`\nPilih booster dengan nomor [1-${availableBoosters.length + 1}] [default: ${DEFAULT_SETTINGS.BOOSTER}]: `);
+        let boosterKey;
+        if (boosterIndex && !isNaN(parseInt(boosterIndex))) {
+            const selectedIndex = parseInt(boosterIndex) - 1;
+            if (selectedIndex >= 0 && selectedIndex < availableBoosters.length) {
+                boosterKey = availableBoosters[selectedIndex][0];
+            } else if (selectedIndex === availableBoosters.length) {
+                boosterKey = 'none';
+            } else {
+                boosterKey = DEFAULT_SETTINGS.BOOSTER;
+            }
+        } else {
+            boosterKey = DEFAULT_SETTINGS.BOOSTER;
+        }
+        
         if (boosterKey !== 'none' && !BOOSTERS[boosterKey]) {
             logger.error(`Booster '${boosterKey}' tidak dikenal.`);
             process.exit(1);
