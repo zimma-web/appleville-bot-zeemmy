@@ -7,6 +7,14 @@ import { logger } from '../../utils/logger.js';
 import { api, CaptchaError, SignatureError } from '../../services/api.js';
 import { BATCH_SETTINGS, API_SETTINGS } from '../../config.js';
 import { sendTelegramMessage } from '../../utils/telegram.js';
+import { profitTracker } from '../../utils/profit-tracker.js';
+import { performanceMetrics } from '../../utils/performance-metrics.js';
+import { smartAlerts } from '../../utils/smart-alerts.js';
+import { autoPrestige } from '../../utils/auto-prestige.js';
+import { dailyReport } from '../../utils/daily-report.js';
+import { autoBackup } from '../../utils/auto-backup.js';
+import { lowBalanceAlert } from '../../utils/low-balance-alert.js';
+import { aiOptimization } from '../../utils/ai-optimization.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -174,7 +182,8 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
     if (!bot.isRunning || bot.isPausedForCaptcha || bot.isPausedForSignature || bot.isBatchCycleRunning) return;
 
     bot.isBatchCycleRunning = true;
-    logger.info('🚀 Batch cycle dimulai...');
+    const batchStartTime = Date.now();
+    logger.info(`🚀 Batch cycle dimulai... (batchCount: ${batchCount})`);
 
     try {
         const state = initialState || (await api.getState()).state;
@@ -186,6 +195,11 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
 
         logger.info(`📊 ${plots.filter(p => p.seed).length}/${targetSlotCount} aktif`);
 
+        // Initialize profit tracker jika belum ada
+        if (batchCount === 1) {
+            profitTracker.initializeSession(state.user || {});
+        }
+
         // [FIXED BATCH MODE] URUTAN: PANEN YANG SIAP → TANAM SEMUA KOSONG → BOOSTER
         
         // 1. [CONSISTENT] PANEN SEMUA 12 SLOT SEKALIGUS (cek yang siap, skip yang belum)
@@ -194,9 +208,11 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
         const notReadyToHarvest = activePlots.filter(p => new Date(p.seed.endsAt).getTime() > now);
         
         // Selalu panen 12 slot sekaligus untuk konsistensi
+        let harvestCount = 0;
         if (activePlots.length > 0) {
             logger.action('harvest', `🔪 Memanen 12 slot...`);
             
+            const harvestStartTime = Date.now();
             const harvestResults = await processBatchInChunks(
                 bot,
                 bot.config.slots, // Selalu proses semua 12 slot
@@ -223,8 +239,13 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
                 API_SETTINGS.BATCH_DELAY
             );
             
+            const harvestDuration = Date.now() - harvestStartTime;
             const successfulHarvests = harvestResults.filter(r => r.success && !r.skipped);
             const skippedHarvests = harvestResults.filter(r => r.skipped);
+            harvestCount = successfulHarvests.length;
+            
+            // Record harvest performance
+            performanceMetrics.recordHarvest(harvestDuration, harvestCount, successfulHarvests.length > 0);
             
             if (successfulHarvests.length > 0) {
                 logger.success(`✅ Panen ${successfulHarvests.length} slot`);
@@ -240,11 +261,13 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
         const emptySlots = plotsAfterHarvest.filter(p => !p.seed);
         
         // Selalu tanam 12 slot sekaligus untuk konsistensi
+        let plantCount = 0;
         if (emptySlots.length > 0) {
             logger.action('plant', `🌱 Menanam 12 slot...`);
             
             await purchaseItemIfNeeded(bot, 'seed', 12);
             
+            const plantStartTime = Date.now();
             const plantResults = await processBatchInChunks(
                 bot,
                 bot.config.slots.map(slotIndex => ({ slotIndex, seedKey: bot.config.seedKey })),
@@ -267,8 +290,13 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
                 API_SETTINGS.BATCH_DELAY
             );
             
+            const plantDuration = Date.now() - plantStartTime;
             const successfulPlants = plantResults.filter(r => r.success && !r.skipped);
             const skippedPlants = plantResults.filter(r => r.skipped);
+            plantCount = successfulPlants.length;
+            
+            // Record plant performance
+            performanceMetrics.recordPlant(plantDuration, plantCount, successfulPlants.length > 0);
             
             if (successfulPlants.length > 0) {
                 logger.success(`✅ Tanam ${successfulPlants.length} slot`);
@@ -296,6 +324,7 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
         }
 
         // 4. [CONSISTENT] TERAPKAN BOOSTER KE SEMUA 12 SLOT
+        let boosterCount = 0;
         if (bot.config.boosterKey) {
             const stateAfterPlant = (await api.getState()).state;
             const plotsAfterPlant = stateAfterPlant.plots.filter(p => bot.config.slots.includes(p.slotIndex));
@@ -306,6 +335,7 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
                 
                 await purchaseItemIfNeeded(bot, 'booster', 12);
                 
+                const boosterStartTime = Date.now();
                 const boosterResults = await processBatchInChunks(
                     bot,
                     bot.config.slots.map(slotIndex => ({ slotIndex, boosterKey: bot.config.boosterKey })),
@@ -332,8 +362,13 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
                     API_SETTINGS.BATCH_DELAY
                 );
                 
+                const boosterDuration = Date.now() - boosterStartTime;
                 const successfulBoosters = boosterResults.filter(r => r.success && !r.skipped);
                 const skippedBoosters = boosterResults.filter(r => r.skipped);
+                boosterCount = successfulBoosters.length;
+                
+                // Record booster performance
+                performanceMetrics.recordBooster(boosterDuration, boosterCount, successfulBoosters.length > 0);
                 
                 if (successfulBoosters.length > 0) {
                     logger.success(`✅ Booster ${successfulBoosters.length} slot`);
@@ -346,22 +381,162 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
             }
         }
 
-        // 5. [FULL CYCLE] Tampilkan info akun singkat
+        // 5. [ENHANCED] Update profit tracker dan performance metrics
+        const currentState = (await api.getState()).state;
+        profitTracker.updateAfterBatch(currentState.user || {}, harvestCount, plantCount, boosterCount);
+        
+        const batchDuration = Date.now() - batchStartTime;
+        performanceMetrics.recordBatchCycle(batchDuration, harvestCount, plantCount, boosterCount, true);
+
+        // 6. [SMART ALERTS] Check alerts
+        smartAlerts.checkLowBalance(currentState.user || {});
+        smartAlerts.checkMilestones(currentState.user || {}, profitTracker.getSessionProfit());
+        smartAlerts.checkPerformance(performanceMetrics.calculateAverages());
+
+        // 7. [LOW BALANCE ALERT] Check balance alerts
+        await lowBalanceAlert.checkBalance(currentState.user || {}, bot);
+
+        // 8. [AUTO PRESTIGE] Check and upgrade if possible
+        await autoPrestige.checkAndUpgrade(currentState.user || {});
+
+        // 7. [ENHANCED] Tampilkan info akun dengan profit data
         await displayAccountInfo(bot, batchCount);
 
-        // 6. [FULL CYCLE] VERIFIKASI FINAL - PASTIKAN 12 SLOT AKTIF
-        const verificationState = (await api.getState()).state;
-        const verificationPlots = verificationState.plots.filter(p => bot.config.slots.includes(p.slotIndex));
+        // 8. [TELEGRAM] Kirim milestone notifications
+        if (batchCount > 0 && batchCount % 15 === 0) { // Every 15 batches
+            const profitReport = profitTracker.generateReport();
+            const performanceReport = performanceMetrics.generateReport();
+            
+            const milestoneMessage = `🎯 *MILESTONE ACHIEVED!* 🎯
+
+🏆 *Batch Milestone #${batchCount}*
+• Total Profit: ${profitReport.summary.totalCoinProfit.toLocaleString()} coins
+• Total AP: ${profitReport.summary.totalAPProfit.toLocaleString()} AP
+• Total Harvests: ${profitReport.summary.totalHarvests}
+• Session Time: ${profitReport.summary.sessionHours.toFixed(2)}h
+• Performance Score: ${performanceMetrics.getPerformanceScore()}/100
+
+🚀 *Bot Status:*
+• Success Rate: ${performanceReport.summary.successRate}
+• Uptime: ${performanceReport.summary.uptime}
+• Operations/Hour: ${performanceReport.summary.operationsPerHour}
+
+⏰ *Waktu:* ${new Date().toLocaleString('id-ID')}`;
+
+            await sendTelegramMessage(milestoneMessage);
+        }
+
+        // 8. [FULL CYCLE] VERIFIKASI FINAL - PASTIKAN 12 SLOT AKTIF
+        const verificationPlots = currentState.plots.filter(p => bot.config.slots.includes(p.slotIndex));
         const verificationActiveSlots = verificationPlots.filter(p => p.seed);
         
         if (verificationActiveSlots.length === targetSlotCount) {
             logger.success(`🎯 ${verificationActiveSlots.length}/${targetSlotCount} aktif`);
         }
 
+        // 9. [ENHANCED] Log profit summary setiap 3 batch + Kirim ke Telegram
+        logger.info(`🔍 Debug: batchCount = ${batchCount}, batchCount % 3 = ${batchCount % 3}`);
+        if (batchCount > 0 && batchCount % 3 === 0) {
+            const profitReport = profitTracker.generateReport();
+            const performanceReport = performanceMetrics.generateReport();
+            
+            logger.info('=== PROFIT SUMMARY ===');
+            logger.info(`💰 Total Profit: ${profitReport.summary.totalCoinProfit} coins, ${profitReport.summary.totalAPProfit} AP`);
+            logger.info(`⏰ Session: ${profitReport.summary.sessionHours.toFixed(2)}h | Rate: ${profitReport.summary.coinsPerHour.toFixed(2)} coins/h`);
+            logger.info(`🌾 Total Harvests: ${profitReport.summary.totalHarvests} | Efficiency: ${profitReport.summary.efficiency.toFixed(2)}`);
+            logger.info('=====================');
+
+            logger.info('=== PERFORMANCE SUMMARY ===');
+            logger.info(`📊 Success Rate: ${performanceReport.summary.successRate} | Uptime: ${performanceReport.summary.uptime}`);
+            logger.info(`⚡ Harvest Speed: ${performanceReport.performance.harvestSpeed} | Plant Speed: ${performanceReport.performance.plantSpeed}`);
+            logger.info(`🎯 Performance Score: ${performanceMetrics.getPerformanceScore()}/100`);
+            logger.info('===========================');
+
+            // Kirim ke Telegram
+            const telegramMessage = `📊 *BATCH REPORT #${batchCount}* 📊
+
+💰 *PROFIT SUMMARY*
+• Total Profit: ${profitReport.summary.totalCoinProfit.toLocaleString()} coins, ${profitReport.summary.totalAPProfit.toLocaleString()} AP
+• Session Time: ${profitReport.summary.sessionHours.toFixed(2)}h
+• Profit Rate: ${profitReport.summary.coinsPerHour.toFixed(2)} coins/h, ${profitReport.summary.apPerHour.toFixed(2)} AP/h
+• Total Harvests: ${profitReport.summary.totalHarvests}
+• Efficiency: ${profitReport.summary.efficiency.toFixed(2)}
+
+📊 *PERFORMANCE SUMMARY*
+• Success Rate: ${performanceReport.summary.successRate}
+• Uptime: ${performanceReport.summary.uptime}
+• Operations/Hour: ${performanceReport.summary.operationsPerHour}
+• Harvest Speed: ${performanceReport.performance.harvestSpeed}
+• Plant Speed: ${performanceReport.performance.plantSpeed}
+• Performance Score: ${performanceMetrics.getPerformanceScore()}/100
+
+⏰ *Waktu:* ${new Date().toLocaleString('id-ID')}`;
+
+            logger.info('📱 Mengirim batch report ke Telegram...');
+            try {
+                await sendTelegramMessage(telegramMessage);
+                logger.info('✅ Batch report berhasil dikirim ke Telegram!');
+            } catch (error) {
+                logger.error(`❌ Gagal mengirim batch report ke Telegram: ${error.message}`);
+            }
+        }
+
+        // 10. [DAILY REPORT] Check if should send daily report
+        if (batchCount > 0 && batchCount % 60 === 0) { // Check every 60 batches
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            
+            // Check if it's time for daily report (8:00 AM)
+            if (currentHour === 8 && currentMinute < 5) {
+                await dailyReport.sendDailyReport();
+            }
+        }
+
+        // 11. [AUTO BACKUP] Check if should backup
+        if (autoBackup.shouldBackup()) {
+            await autoBackup.createBackup();
+        }
+
+        // 12. [AI OPTIMIZATION] Run AI optimization
+        if (batchCount > 0 && batchCount % 30 === 0) { // Every 30 batches
+            await aiOptimization.runOptimization();
+        }
+
     } catch (error) {
-        if (error instanceof CaptchaError) return bot.handleCaptchaRequired();
+        if (error instanceof CaptchaError) {
+            smartAlerts.checkCaptchaTimeout(bot.lastCaptchaTimestamp);
+            return bot.handleCaptchaRequired();
+        }
         if (error instanceof SignatureError) return bot.handleSignatureError();
+        
+        // Record error in performance metrics
+        const batchDuration = Date.now() - batchStartTime;
+        performanceMetrics.recordBatchCycle(batchDuration, 0, 0, 0, false);
+        
         logger.error(`❌ Error batch: ${error.message}`);
+        
+        // Send error notification to Telegram
+        const errorMessage = `🚨 *BATCH ERROR ALERT* 🚨
+
+❌ *Error Terjadi!*
+• Error: ${error.message}
+• Batch Count: ${batchCount}
+• Duration: ${batchDuration}ms
+• Status: ⚠️ KRITIS
+
+🔄 *Aksi:*
+• Bot akan mencoba melanjutkan
+• Periksa koneksi internet
+• Restart bot jika error berlanjut
+
+⏰ *Waktu:* ${new Date().toLocaleString('id-ID')}`;
+
+        try {
+            await sendTelegramMessage(errorMessage);
+        } catch (telegramError) {
+            logger.warn(`Failed to send error notification: ${telegramError.message}`);
+        }
     } finally {
         bot.isBatchCycleRunning = false;
         logger.info(`🔄 Batch selesai`);

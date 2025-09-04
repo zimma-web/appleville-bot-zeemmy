@@ -9,6 +9,7 @@ import { handleBatchCycle } from './handlers/actionHandlers.js';
 import { handleCaptchaRequired, checkPrestigeUpgrade, handleSignatureError } from './handlers/eventHandlers.js';
 import { displayStatus } from './utils/display.js';
 import { BATCH_SETTINGS } from '../config.js';
+import { sendTelegramMessage } from '../utils/telegram.js';
 
 export class Bot {
     constructor(config) {
@@ -42,6 +43,30 @@ export class Bot {
             this.userIdentifier = data.user?.rewardWalletAddress || 'Unknown Account';
             this.notifiedPrestigeLevel = data.user?.prestigeLevel || 0;
 
+            // Send Telegram notification
+            const startMessage = `🚀 *BOT STARTED!* 🚀
+
+🤖 *Bot Status:*
+• Status: ✅ RUNNING
+• Mode: BATCH ONLY
+• Slots: ${this.config.slots.length}
+• Seed: ${this.config.seedKey}
+• Booster: ${this.config.boosterKey || 'None'}
+
+⚙️ *Configuration:*
+• Batch Interval: ${BATCH_SETTINGS.INTERVAL}ms
+• Max Batch Size: 12
+• Auto Prestige: Enabled
+• Smart Alerts: Enabled
+
+⏰ *Waktu:* ${new Date().toLocaleString('id-ID')}`;
+
+            try {
+                await sendTelegramMessage(startMessage);
+            } catch (error) {
+                logger.warn(`Failed to send start notification: ${error.message}`);
+            }
+
             await this.refreshAllTimers(data.state);
 
         } catch (error) {
@@ -65,6 +90,27 @@ export class Bot {
         clearInterval(this.statusInterval);
         clearInterval(this.captchaCheckInterval);
         clearInterval(this.prestigeCheckInterval);
+
+        // Send Telegram notification
+        const stopMessage = `🛑 *BOT STOPPED!* 🛑
+
+🤖 *Bot Status:*
+• Status: ❌ STOPPED
+• Reason: Manual Stop
+• Session Ended: ${new Date().toLocaleString('id-ID')}
+
+📊 *Final Stats:*
+• Total Batches: ${this.batchCycleCount}
+• User: ${this.userIdentifier}
+• Prestige Level: ${this.notifiedPrestigeLevel}
+
+⏰ *Waktu:* ${new Date().toLocaleString('id-ID')}`;
+
+        try {
+            sendTelegramMessage(stopMessage);
+        } catch (error) {
+            logger.warn(`Failed to send stop notification: ${error.message}`);
+        }
 
         logger.success('Bot berhenti dengan aman.');
         process.exit(0);

@@ -1,0 +1,1241 @@
+{
+  "batchCycles": [
+    {
+      "timestamp": 1756969102177,
+      "duration": 384,
+      "harvestCount": 0,
+      "plantCount": 0,
+      "boosterCount": 0,
+      "success": false,
+      "efficiency": 0
+    }
+  ],
+  "harvestTimes": [
+    {
+      "timestamp": 1756969113526,
+      "duration": 10051,
+      "slotCount": 12,
+      "success": true,
+      "slotsPerSecond": 1.1939110536265047
+    },
+    {
+      "timestamp": 1756969133471,
+      "duration": 6584,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7594167679222358
+    },
+    {
+      "timestamp": 1756969154177,
+      "duration": 8843,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.0177541558294696
+    },
+    {
+      "timestamp": 1756969171528,
+      "duration": 6786,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7368110816386679
+    },
+    {
+      "timestamp": 1756969190015,
+      "duration": 8093,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.1120721611268998
+    },
+    {
+      "timestamp": 1756969209757,
+      "duration": 7416,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8090614886731391
+    },
+    {
+      "timestamp": 1756969446988,
+      "duration": 9704,
+      "slotCount": 12,
+      "success": true,
+      "slotsPerSecond": 1.2366034624896949
+    },
+    {
+      "timestamp": 1756969465792,
+      "duration": 6024,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8300132802124834
+    },
+    {
+      "timestamp": 1756969483309,
+      "duration": 7936,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0080645161290323
+    },
+    {
+      "timestamp": 1756969498826,
+      "duration": 6083,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8219628472793029
+    },
+    {
+      "timestamp": 1756969516093,
+      "duration": 8081,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 0.9899764880584087
+    },
+    {
+      "timestamp": 1756969531887,
+      "duration": 6134,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8151287903488751
+    },
+    {
+      "timestamp": 1756969549742,
+      "duration": 7921,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0099734881959348
+    },
+    {
+      "timestamp": 1756969567356,
+      "duration": 6207,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8055421298533914
+    },
+    {
+      "timestamp": 1756969584663,
+      "duration": 7183,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1137407768341918
+    },
+    {
+      "timestamp": 1756969601333,
+      "duration": 6163,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8112932013629726
+    },
+    {
+      "timestamp": 1756969616742,
+      "duration": 6674,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0488462691039855
+    },
+    {
+      "timestamp": 1756969631897,
+      "duration": 5972,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8372404554588078
+    },
+    {
+      "timestamp": 1756969648189,
+      "duration": 6671,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.049317943336831
+    },
+    {
+      "timestamp": 1756969664047,
+      "duration": 6105,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8190008190008189
+    },
+    {
+      "timestamp": 1756969679743,
+      "duration": 6672,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0491606714628299
+    },
+    {
+      "timestamp": 1756969696557,
+      "duration": 6852,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7297139521307647
+    },
+    {
+      "timestamp": 1756969712966,
+      "duration": 7704,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9086188992731049
+    },
+    {
+      "timestamp": 1756969730745,
+      "duration": 6811,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7341065922771987
+    },
+    {
+      "timestamp": 1756969747350,
+      "duration": 6909,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0131712259371835
+    },
+    {
+      "timestamp": 1756969764342,
+      "duration": 7004,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7138777841233581
+    },
+    {
+      "timestamp": 1756969780810,
+      "duration": 7002,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9997143673236218
+    },
+    {
+      "timestamp": 1756969797038,
+      "duration": 6009,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8320852055250457
+    },
+    {
+      "timestamp": 1756969814825,
+      "duration": 8113,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 0.9860717367188464
+    },
+    {
+      "timestamp": 1756969832098,
+      "duration": 6136,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8148631029986962
+    },
+    {
+      "timestamp": 1756969847860,
+      "duration": 6744,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0379596678529064
+    },
+    {
+      "timestamp": 1756969863653,
+      "duration": 6072,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8234519104084321
+    },
+    {
+      "timestamp": 1756969879869,
+      "duration": 6735,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0393466963622866
+    },
+    {
+      "timestamp": 1756969896553,
+      "duration": 6038,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8280887711162637
+    },
+    {
+      "timestamp": 1756969912689,
+      "duration": 6940,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0086455331412103
+    },
+    {
+      "timestamp": 1756969929877,
+      "duration": 5930,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8431703204047218
+    },
+    {
+      "timestamp": 1756969945628,
+      "duration": 7455,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9389671361502347
+    },
+    {
+      "timestamp": 1756969962089,
+      "duration": 6157,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8120838070488875
+    },
+    {
+      "timestamp": 1756969980235,
+      "duration": 8321,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.0816007691383247
+    },
+    {
+      "timestamp": 1756969996722,
+      "duration": 6268,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7977026164645821
+    },
+    {
+      "timestamp": 1756970012594,
+      "duration": 7187,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1131209127591484
+    },
+    {
+      "timestamp": 1756970030432,
+      "duration": 6942,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7202535292422932
+    },
+    {
+      "timestamp": 1756970046359,
+      "duration": 7327,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9553705472908421
+    },
+    {
+      "timestamp": 1756970062935,
+      "duration": 6250,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8
+    },
+    {
+      "timestamp": 1756970079074,
+      "duration": 7049,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1349127535820682
+    },
+    {
+      "timestamp": 1756970095618,
+      "duration": 6019,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8307027745472669
+    },
+    {
+      "timestamp": 1756970112930,
+      "duration": 7198,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1114198388441232
+    },
+    {
+      "timestamp": 1756970131271,
+      "duration": 6857,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.729181857955374
+    },
+    {
+      "timestamp": 1756970149778,
+      "duration": 8502,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.0585744530698658
+    },
+    {
+      "timestamp": 1756970167000,
+      "duration": 7008,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7134703196347032
+    },
+    {
+      "timestamp": 1756970191942,
+      "duration": 7850,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.1464968152866242
+    },
+    {
+      "timestamp": 1756970210256,
+      "duration": 6579,
+      "slotCount": 4,
+      "success": true,
+      "slotsPerSecond": 0.6079951360389118
+    },
+    {
+      "timestamp": 1756970227721,
+      "duration": 8092,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 0.9886307464162135
+    },
+    {
+      "timestamp": 1756970244488,
+      "duration": 6505,
+      "slotCount": 4,
+      "success": true,
+      "slotsPerSecond": 0.6149116064565718
+    },
+    {
+      "timestamp": 1756970260966,
+      "duration": 7535,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.06171201061712
+    },
+    {
+      "timestamp": 1756970277239,
+      "duration": 5979,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8362602441879913
+    },
+    {
+      "timestamp": 1756970294531,
+      "duration": 7589,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9223876663592041
+    },
+    {
+      "timestamp": 1756970310729,
+      "duration": 6903,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7243227582210634
+    },
+    {
+      "timestamp": 1756970328342,
+      "duration": 7971,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0036381884330698
+    },
+    {
+      "timestamp": 1756970345768,
+      "duration": 7109,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7033338022225348
+    },
+    {
+      "timestamp": 1756970361229,
+      "duration": 6742,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0382675763868288
+    },
+    {
+      "timestamp": 1756970377238,
+      "duration": 6013,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8315316813570597
+    },
+    {
+      "timestamp": 1756970394589,
+      "duration": 7757,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9024107257960552
+    },
+    {
+      "timestamp": 1756970412236,
+      "duration": 6878,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7269555103227683
+    },
+    {
+      "timestamp": 1756970430315,
+      "duration": 7380,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.2195121951219512
+    },
+    {
+      "timestamp": 1756970446927,
+      "duration": 6185,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8084074373484237
+    },
+    {
+      "timestamp": 1756970464005,
+      "duration": 7100,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1267605633802817
+    },
+    {
+      "timestamp": 1756970481843,
+      "duration": 6948,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7196315486470927
+    },
+    {
+      "timestamp": 1756970498803,
+      "duration": 7521,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9307272969020077
+    },
+    {
+      "timestamp": 1756970515119,
+      "duration": 5914,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8454514710855597
+    },
+    {
+      "timestamp": 1756970531121,
+      "duration": 6652,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0523150932050511
+    },
+    {
+      "timestamp": 1756970548645,
+      "duration": 6187,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8081461128171973
+    },
+    {
+      "timestamp": 1756970563907,
+      "duration": 6644,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.053582179409994
+    },
+    {
+      "timestamp": 1756970580392,
+      "duration": 6060,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8250825082508252
+    },
+    {
+      "timestamp": 1756970596722,
+      "duration": 6939,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0087908920593744
+    },
+    {
+      "timestamp": 1756970614161,
+      "duration": 7034,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7108330963889679
+    },
+    {
+      "timestamp": 1756970632434,
+      "duration": 8082,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 0.9898539965355109
+    },
+    {
+      "timestamp": 1756970649317,
+      "duration": 6031,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8290499088045101
+    },
+    {
+      "timestamp": 1756970667627,
+      "duration": 8126,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 0.9844942160964805
+    },
+    {
+      "timestamp": 1756970684382,
+      "duration": 6065,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8244023083264632
+    },
+    {
+      "timestamp": 1756970749715,
+      "duration": 10425,
+      "slotCount": 11,
+      "success": true,
+      "slotsPerSecond": 1.05515587529976
+    },
+    {
+      "timestamp": 1756970770275,
+      "duration": 6616,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7557436517533254
+    },
+    {
+      "timestamp": 1756970790830,
+      "duration": 9306,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 0.9671179883945842
+    },
+    {
+      "timestamp": 1756970809841,
+      "duration": 6865,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8739985433357611
+    },
+    {
+      "timestamp": 1756970829619,
+      "duration": 9167,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 0.9817824806370677
+    },
+    {
+      "timestamp": 1756970848026,
+      "duration": 6851,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8757845569989783
+    },
+    {
+      "timestamp": 1756970866876,
+      "duration": 7601,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.052493093014077
+    },
+    {
+      "timestamp": 1756970884874,
+      "duration": 7436,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8068854222700377
+    }
+  ],
+  "plantTimes": [
+    {
+      "timestamp": 1756969124261,
+      "duration": 9555,
+      "slotCount": 12,
+      "success": true,
+      "slotsPerSecond": 1.2558869701726845
+    },
+    {
+      "timestamp": 1756969142741,
+      "duration": 6852,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7297139521307647
+    },
+    {
+      "timestamp": 1756969163059,
+      "duration": 8090,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.1124845488257107
+    },
+    {
+      "timestamp": 1756969179401,
+      "duration": 6610,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.75642965204236
+    },
+    {
+      "timestamp": 1756969199676,
+      "duration": 8040,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.119402985074627
+    },
+    {
+      "timestamp": 1756969457353,
+      "duration": 8376,
+      "slotCount": 12,
+      "success": true,
+      "slotsPerSecond": 1.4326647564469914
+    },
+    {
+      "timestamp": 1756969472880,
+      "duration": 6003,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8329168748958854
+    },
+    {
+      "timestamp": 1756969491143,
+      "duration": 7034,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1373329542223487
+    },
+    {
+      "timestamp": 1756969506234,
+      "duration": 6259,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7988496564946477
+    },
+    {
+      "timestamp": 1756969524180,
+      "duration": 7169,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1159157483609987
+    },
+    {
+      "timestamp": 1756969540163,
+      "duration": 6289,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7950389569088886
+    },
+    {
+      "timestamp": 1756969558562,
+      "duration": 7251,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1032960970900565
+    },
+    {
+      "timestamp": 1756969575020,
+      "duration": 6171,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8102414519526818
+    },
+    {
+      "timestamp": 1756969592699,
+      "duration": 7267,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1008669327095086
+    },
+    {
+      "timestamp": 1756969608405,
+      "duration": 5907,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8464533604198409
+    },
+    {
+      "timestamp": 1756969624254,
+      "duration": 6732,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0398098633392752
+    },
+    {
+      "timestamp": 1756969639949,
+      "duration": 6081,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8222331853313599
+    },
+    {
+      "timestamp": 1756969656186,
+      "duration": 7066,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9906594961788848
+    },
+    {
+      "timestamp": 1756969671445,
+      "duration": 6264,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7982120051085568
+    },
+    {
+      "timestamp": 1756969688082,
+      "duration": 6786,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0315355142941351
+    },
+    {
+      "timestamp": 1756969703689,
+      "duration": 5964,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8383635144198524
+    },
+    {
+      "timestamp": 1756969721284,
+      "duration": 6710,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0432190760059612
+    },
+    {
+      "timestamp": 1756969738856,
+      "duration": 6075,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.823045267489712
+    },
+    {
+      "timestamp": 1756969754823,
+      "duration": 6712,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0429082240762813
+    },
+    {
+      "timestamp": 1756969772233,
+      "duration": 5944,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8411843876177658
+    },
+    {
+      "timestamp": 1756969789287,
+      "duration": 6878,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0177377144518756
+    },
+    {
+      "timestamp": 1756969804226,
+      "duration": 6051,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8263097008758883
+    },
+    {
+      "timestamp": 1756969823519,
+      "duration": 7091,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1281906642222534
+    },
+    {
+      "timestamp": 1756969839506,
+      "duration": 6209,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8052826542116284
+    },
+    {
+      "timestamp": 1756969855991,
+      "duration": 6978,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.003152765835483
+    },
+    {
+      "timestamp": 1756969871516,
+      "duration": 6262,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7984669434685404
+    },
+    {
+      "timestamp": 1756969888893,
+      "duration": 7049,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 0.9930486593843098
+    },
+    {
+      "timestamp": 1756969904156,
+      "duration": 6016,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8311170212765957
+    },
+    {
+      "timestamp": 1756969921337,
+      "duration": 6683,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0474337872213078
+    },
+    {
+      "timestamp": 1756969936595,
+      "duration": 5984,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8355614973262032
+    },
+    {
+      "timestamp": 1756969954301,
+      "duration": 6699,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.044932079414838
+    },
+    {
+      "timestamp": 1756969969323,
+      "duration": 6468,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7730364873222016
+    },
+    {
+      "timestamp": 1756969988858,
+      "duration": 7492,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.201281366791244
+    },
+    {
+      "timestamp": 1756970003626,
+      "duration": 6188,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8080155138978669
+    },
+    {
+      "timestamp": 1756970021019,
+      "duration": 7257,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1023839051949842
+    },
+    {
+      "timestamp": 1756970037492,
+      "duration": 6228,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8028259473346179
+    },
+    {
+      "timestamp": 1756970055093,
+      "duration": 6729,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0402734433050973
+    },
+    {
+      "timestamp": 1756970069593,
+      "duration": 5899,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8476012883539583
+    },
+    {
+      "timestamp": 1756970087983,
+      "duration": 6953,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1505824823817057
+    },
+    {
+      "timestamp": 1756970103289,
+      "duration": 6083,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8219628472793029
+    },
+    {
+      "timestamp": 1756970121995,
+      "duration": 7094,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.127713560755568
+    },
+    {
+      "timestamp": 1756970138752,
+      "duration": 6359,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7862871520679352
+    },
+    {
+      "timestamp": 1756970158188,
+      "duration": 7664,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.174321503131524
+    },
+    {
+      "timestamp": 1756970202056,
+      "duration": 8493,
+      "slotCount": 12,
+      "success": true,
+      "slotsPerSecond": 1.412928293889085
+    },
+    {
+      "timestamp": 1756970217963,
+      "duration": 5717,
+      "slotCount": 4,
+      "success": true,
+      "slotsPerSecond": 0.6996676578625154
+    },
+    {
+      "timestamp": 1756970236396,
+      "duration": 7108,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1254924029262803
+    },
+    {
+      "timestamp": 1756970251838,
+      "duration": 5986,
+      "slotCount": 4,
+      "success": true,
+      "slotsPerSecond": 0.6682258603407952
+    },
+    {
+      "timestamp": 1756970268777,
+      "duration": 7045,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1355571327182399
+    },
+    {
+      "timestamp": 1756970285312,
+      "duration": 6130,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8156606851549756
+    },
+    {
+      "timestamp": 1756970302226,
+      "duration": 6937,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0090817356205852
+    },
+    {
+      "timestamp": 1756970317944,
+      "duration": 6083,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8219628472793029
+    },
+    {
+      "timestamp": 1756970336974,
+      "duration": 7045,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1355571327182399
+    },
+    {
+      "timestamp": 1756970352923,
+      "duration": 6021,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8304268393954493
+    },
+    {
+      "timestamp": 1756970368790,
+      "duration": 6808,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.028202115158637
+    },
+    {
+      "timestamp": 1756970385197,
+      "duration": 5969,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8376612497905846
+    },
+    {
+      "timestamp": 1756970402906,
+      "duration": 6729,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0402734433050973
+    },
+    {
+      "timestamp": 1756970420472,
+      "duration": 6292,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7946598855689765
+    },
+    {
+      "timestamp": 1756970439131,
+      "duration": 7992,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.1261261261261262
+    },
+    {
+      "timestamp": 1756970455194,
+      "duration": 6319,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7912644405760405
+    },
+    {
+      "timestamp": 1756970473273,
+      "duration": 7106,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.125809175344779
+    },
+    {
+      "timestamp": 1756970489719,
+      "duration": 6305,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7930214115781127
+    },
+    {
+      "timestamp": 1756970506754,
+      "duration": 6806,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0285042609462238
+    },
+    {
+      "timestamp": 1756970522698,
+      "duration": 5952,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8400537634408602
+    },
+    {
+      "timestamp": 1756970539969,
+      "duration": 6890,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0159651669085632
+    },
+    {
+      "timestamp": 1756970555399,
+      "duration": 6040,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8278145695364238
+    },
+    {
+      "timestamp": 1756970572713,
+      "duration": 6818,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.026694045174538
+    },
+    {
+      "timestamp": 1756970588040,
+      "duration": 6036,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.828363154406892
+    },
+    {
+      "timestamp": 1756970605507,
+      "duration": 6823,
+      "slotCount": 7,
+      "success": true,
+      "slotsPerSecond": 1.0259416678880258
+    },
+    {
+      "timestamp": 1756970622710,
+      "duration": 6977,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.716640389852372
+    },
+    {
+      "timestamp": 1756970641579,
+      "duration": 7199,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1112654535352133
+    },
+    {
+      "timestamp": 1756970657113,
+      "duration": 6232,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8023106546854942
+    },
+    {
+      "timestamp": 1756970675861,
+      "duration": 7100,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.1267605633802817
+    },
+    {
+      "timestamp": 1756970691025,
+      "duration": 5923,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.8441668073611346
+    },
+    {
+      "timestamp": 1756970761065,
+      "duration": 9365,
+      "slotCount": 12,
+      "success": true,
+      "slotsPerSecond": 1.2813667912439937
+    },
+    {
+      "timestamp": 1756970779073,
+      "duration": 6763,
+      "slotCount": 5,
+      "success": true,
+      "slotsPerSecond": 0.7393168712110011
+    },
+    {
+      "timestamp": 1756970800257,
+      "duration": 7810,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.1523687580025608
+    },
+    {
+      "timestamp": 1756970817872,
+      "duration": 6862,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8743806470416788
+    },
+    {
+      "timestamp": 1756970839479,
+      "duration": 8254,
+      "slotCount": 9,
+      "success": true,
+      "slotsPerSecond": 1.0903804216137631
+    },
+    {
+      "timestamp": 1756970857569,
+      "duration": 7317,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8200082000820008
+    },
+    {
+      "timestamp": 1756970875709,
+      "duration": 7617,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0502822633582776
+    },
+    {
+      "timestamp": 1756970893303,
+      "duration": 6799,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8824827180467716
+    }
+  ],
+  "boosterTimes": [],
+  "errorCount": 1,
+  "successCount": 0,
+  "totalUptime": 0,
+  "startTime": 1756969090569,
+  "lastUpdate": 1756970893303
+}
