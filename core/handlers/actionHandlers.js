@@ -15,6 +15,8 @@ import { dailyReport } from '../../utils/daily-report.js';
 import { autoBackup } from '../../utils/auto-backup.js';
 import { lowBalanceAlert } from '../../utils/low-balance-alert.js';
 import { aiOptimization } from '../../utils/ai-optimization.js';
+import { smartPrestigeManager } from '../../utils/smart-prestige-manager.js';
+import { autoSlotUpgrader } from '../../utils/auto-slot-upgrader.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -398,6 +400,12 @@ export async function handleBatchCycle(bot, initialState = null, batchCount = 0)
 
         // 8. [AUTO PRESTIGE] Check and upgrade if possible
         await autoPrestige.checkAndUpgrade(currentState.user || {});
+
+        // 8.5. [SMART PRESTIGE MANAGER] Auto-update seed dan booster setelah prestige
+        await smartPrestigeManager.checkAndUpdate(bot);
+
+        // 8.6. [AUTO SLOT UPGRADER] Upgrade slot otomatis jika ada resources
+        await autoSlotUpgrader.checkAndUpgrade();
 
         // 7. [ENHANCED] Tampilkan info akun dengan profit data
         await displayAccountInfo(bot, batchCount);

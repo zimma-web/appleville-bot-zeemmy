@@ -626,6 +626,48 @@
       "slotCount": 6,
       "success": true,
       "slotsPerSecond": 0.8068854222700377
+    },
+    {
+      "timestamp": 1756970903692,
+      "duration": 7816,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0235414534288638
+    },
+    {
+      "timestamp": 1756970922026,
+      "duration": 7840,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.7653061224489796
+    },
+    {
+      "timestamp": 1756970939541,
+      "duration": 7594,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.053463260468791
+    },
+    {
+      "timestamp": 1756970958440,
+      "duration": 7312,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8205689277899343
+    },
+    {
+      "timestamp": 1756970976137,
+      "duration": 7703,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0385564065948332
+    },
+    {
+      "timestamp": 1756970994822,
+      "duration": 7887,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.7607455306200076
     }
   ],
   "plantTimes": [
@@ -1230,6 +1272,48 @@
       "slotCount": 6,
       "success": true,
       "slotsPerSecond": 0.8824827180467716
+    },
+    {
+      "timestamp": 1756970912564,
+      "duration": 7693,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.039906408423242
+    },
+    {
+      "timestamp": 1756970930204,
+      "duration": 7030,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8534850640113798
+    },
+    {
+      "timestamp": 1756970948634,
+      "duration": 7509,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0653882008256759
+    },
+    {
+      "timestamp": 1756970966662,
+      "duration": 7026,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8539709649871905
+    },
+    {
+      "timestamp": 1756970984407,
+      "duration": 7349,
+      "slotCount": 8,
+      "success": true,
+      "slotsPerSecond": 1.0885834807456796
+    },
+    {
+      "timestamp": 1756971002865,
+      "duration": 6800,
+      "slotCount": 6,
+      "success": true,
+      "slotsPerSecond": 0.8823529411764706
     }
   ],
   "boosterTimes": [],
@@ -1237,5 +1321,5 @@
   "successCount": 0,
   "totalUptime": 0,
   "startTime": 1756969090569,
-  "lastUpdate": 1756970893303
+  "lastUpdate": 1756971002865
 }
