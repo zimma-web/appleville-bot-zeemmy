@@ -23,13 +23,13 @@ export const DEFAULT_SETTINGS = {
 export const API_SETTINGS = {
     BASE_URL: 'https://app.appleville.xyz/api/trpc',
     MAX_RETRIES: 3,
-    RETRY_DELAY: 1000, // dalam milidetik (dikurangi dari 2000ms ke 1000ms)
-    PAUSE_MS: 300, // jeda antar panggilan API (dikurangi dari 1000ms ke 300ms)
-    BATCH_DELAY: 500, // jeda antar operasi batch (dikurangi dari 2000ms ke 500ms)
-    HARVEST_DELAY: 400, // jeda antar panen (dikurangi dari 1500ms ke 400ms)
-    PLANT_DELAY: 300, // jeda antar tanam (dikurangi dari 1200ms ke 300ms)
-    BOOSTER_DELAY: 400, // jeda antar pemasangan booster (dikurangi dari 1400ms ke 400ms)
-    MAX_CONCURRENT_REQUESTS: 2, // maksimal request bersamaan (ditingkatkan dari 1 ke 2)
+    RETRY_DELAY: 200, // dalam milidetik (dikurangi drastis untuk kecepatan maksimal)
+    PAUSE_MS: 25, // jeda antar panggilan API (dikurangi drastis untuk kecepatan maksimal)
+    BATCH_DELAY: 50, // jeda antar operasi batch (dikurangi drastis untuk kecepatan maksimal)
+    HARVEST_DELAY: 25, // jeda antar panen (dikurangi drastis untuk kecepatan maksimal)
+    PLANT_DELAY: 25, // jeda antar tanam (dikurangi drastis untuk kecepatan maksimal)
+    BOOSTER_DELAY: 25, // jeda antar pemasangan booster (dikurangi drastis untuk kecepatan maksimal)
+    MAX_CONCURRENT_REQUESTS: 5, // maksimal request bersamaan (ditingkatkan untuk kecepatan)
 };
 
 /**
@@ -38,7 +38,7 @@ export const API_SETTINGS = {
  */
 export const BATCH_SETTINGS = {
     ENABLED_SEEDS: ['wheat', 'lettuce'], // Tambahkan bibit cepat lainnya di sini
-    INTERVAL: 5000, // Cek setiap 5 detik
+    INTERVAL: 500, // Cek setiap 0.5 detik (dipercepat drastis untuk responsivitas maksimal)
 };
 
 /**
@@ -105,4 +105,101 @@ export const PRESTIGE_LEVELS = {
     5: { multiplier: 1.8, apRequired: 750000 },
     6: { multiplier: 1.9, apRequired: 900000 },
     7: { multiplier: 2.0, apRequired: 1000000 },
+};
+
+/**
+ * [BARU] COMBO PRESETS - Kombinasi Seed + Booster yang Populer
+ * Memudahkan pengguna memilih kombinasi yang sudah terbukti efektif
+ */
+export const COMBO_PRESETS = {
+    // COMBO UNTUK PEMULA (Tanpa Prestige)
+    'beginner-fast': {
+        name: '🚀 Pemula Cepat',
+        description: 'Wheat + Fertiliser - Panen cepat untuk pemula',
+        seed: 'wheat',
+        booster: 'fertiliser',
+        seedBuyQty: 50,
+        boosterBuyQty: 20,
+        prestige: 0
+    },
+    'beginner-profit': {
+        name: '💰 Pemula Profit',
+        description: 'Lettuce + Silver Tonic - Balance kecepatan dan profit',
+        seed: 'lettuce',
+        booster: 'silver-tonic',
+        seedBuyQty: 30,
+        boosterBuyQty: 15,
+        prestige: 0
+    },
+    
+    // COMBO UNTUK MENENGAH
+    'intermediate-apple': {
+        name: '🍎 Menengah Apple',
+        description: 'Golden Apple + Super Fertiliser - Apple farming yang efisien',
+        seed: 'golden-apple',
+        booster: 'super-fertiliser',
+        seedBuyQty: 20,
+        boosterBuyQty: 10,
+        prestige: 0
+    },
+    'intermediate-coin': {
+        name: '🪙 Menengah Coin',
+        description: 'Carrot + Golden Tonic - Coin farming yang solid',
+        seed: 'carrot',
+        booster: 'golden-tonic',
+        seedBuyQty: 15,
+        boosterBuyQty: 8,
+        prestige: 0
+    },
+    
+    // COMBO UNTUK ADVANCED
+    'advanced-speed': {
+        name: '⚡ Advanced Speed',
+        description: 'Crystal Apple + Deadly Mix - Speed farming maksimal',
+        seed: 'crystal-apple',
+        booster: 'deadly-mix',
+        seedBuyQty: 12,
+        boosterBuyQty: 6,
+        prestige: 0
+    },
+    'advanced-profit': {
+        name: '💎 Advanced Profit',
+        description: 'Diamond Apple + Quantum Fertilizer - Profit farming optimal',
+        seed: 'diamond-apple',
+        booster: 'quantum-fertilizer',
+        seedBuyQty: 12,
+        boosterBuyQty: 6,
+        prestige: 0
+    },
+    
+    // COMBO UNTUK EXPERT
+    'expert-long': {
+        name: '🏆 Expert Long Term',
+        description: 'Royal Apple + Apex Potion - Long term farming (Prestige 7)',
+        seed: 'royal-apple',
+        booster: 'apex-potion',
+        seedBuyQty: 12,
+        boosterBuyQty: 6,
+        prestige: 7
+    },
+    'expert-legacy': {
+        name: '👑 Expert Legacy',
+        description: 'Legacy Apple + Apex Potion - Prestige farming (Prestige 1+)',
+        seed: 'legacy-apple',
+        booster: 'apex-potion',
+        seedBuyQty: 12,
+        boosterBuyQty: 6,
+        prestige: 1
+    },
+    
+    // COMBO CUSTOM
+    'custom': {
+        name: '⚙️ Custom Setup',
+        description: 'Pilih seed dan booster sendiri',
+        seed: null,
+        booster: null,
+        seedBuyQty: 12,
+        boosterBuyQty: 12,
+        prestige: 0
+    }
 };

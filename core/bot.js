@@ -26,6 +26,7 @@ export class Bot {
         this.isBuyingBooster = false;
         this.userIdentifier = 'Unknown Account';
         this.lastCaptchaTimestamp = null;
+        this.batchCycleCount = 0; // Counter untuk batch cycle
     }
 
     async start(initialState = null) {
@@ -93,7 +94,7 @@ export class Bot {
     }
 
     runBatchMode(plots) {
-        logger.info('🚀 Mode Batch: Mengatur siklus batch berikutnya.');
+        logger.info('🚀 Batch mode...');
         let nextBatchHarvestTime = Infinity;
         let allSlotsEmpty = true;
 
@@ -109,12 +110,12 @@ export class Bot {
 
         if (allSlotsEmpty) {
             // Jika semua slot kosong, langsung jalankan batch cycle
-            logger.info('🌱 Semua slot kosong, menjalankan batch cycle...');
+            logger.info('🌱 Slot kosong, batch...');
             this.handleBatchCycle();
         } else {
             const duration = nextBatchHarvestTime - Date.now();
-            const delay = Math.max(0, duration) + 1000;
-            logger.info(`⏰ Batch cycle berikutnya dalam ${Math.round(delay / 1000)} detik`);
+            const delay = Math.max(0, duration) + 500;
+            logger.info(`⏰ ${Math.round(delay / 1000)}s`);
             this.batchTimer = setTimeout(() => this.handleBatchCycle(), delay);
         }
     }
@@ -125,7 +126,8 @@ export class Bot {
             logger.debug('Batch cycle sudah berjalan, skip...');
             return;
         }
-        await handleBatchCycle(this);
+        this.batchCycleCount++; // Increment counter
+        await handleBatchCycle(this, null, this.batchCycleCount);
     }
 
     // --- Event Handlers ---

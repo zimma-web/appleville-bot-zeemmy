@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from './utils/logger.js';
 import { setCookie, api } from './services/api.js';
-import { DEFAULT_SETTINGS, SEEDS, BOOSTERS, PRESTIGE_LEVELS } from './config.js';
+import { DEFAULT_SETTINGS, SEEDS, BOOSTERS, PRESTIGE_LEVELS, COMBO_PRESETS } from './config.js';
 import { Bot } from './core/bot.js';
 import { updateSignature } from './utils/signature-updater.js';
 import { loadSignatureConfig } from './utils/signature.js';
@@ -247,76 +247,127 @@ async function start() {
         let slots = slotsAns ? slotsAns.split(',').map(x => parseInt(x.trim(), 10)).filter(Boolean) : allSlots;
         if (!slots.length) slots = allSlots;
 
-        // Menampilkan daftar bibit yang sesuai dengan level prestige
-        console.log('\n--- Bibit Tersedia ---');
-        const availableSeeds = Object.entries(SEEDS)
-            .filter(([key, seedData]) => !seedData.prestige || seedData.prestige <= userPrestigeLevel);
+        // [BARU] Tampilkan pilihan COMBO PRESETS
+        console.log('\n🎯 === COMBO PRESETS ===');
+        console.log('Pilih combo yang sudah terbukti efektif:');
         
-        availableSeeds.forEach(([key, seedData], index) => {
-            const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
-            const prestigeInfo = seedData.prestige ? ` (Prestige: ${seedData.prestige})` : '';
-            const rewardInfo = seedData.reward ? `| Reward: ${seedData.rewardCurrency === 'coins' ? '🪙' : '🍎'} ${seedData.reward}` : '';
-            console.log(`${index + 1}. ${key.padEnd(18, ' ')} ${growTime.padEnd(10, ' ')} ${rewardInfo} ${prestigeInfo}`);
+        const availableCombos = Object.entries(COMBO_PRESETS)
+            .filter(([key, comboData]) => !comboData.prestige || comboData.prestige <= userPrestigeLevel);
+        
+        availableCombos.forEach(([key, comboData], index) => {
+            console.log(`${index + 1}. ${comboData.name}`);
+            console.log(`   ${comboData.description}`);
+            if (comboData.prestige > 0) {
+                console.log(`   ⚠️  Membutuhkan Prestige ${comboData.prestige}`);
+            }
+            console.log('');
         });
         
-        const seedIndex = await askQuestion(`\nPilih bibit dengan nomor [1-${availableSeeds.length}] [default: ${DEFAULT_SETTINGS.SEED}]: `);
-        let seedKey;
-        if (seedIndex && !isNaN(parseInt(seedIndex))) {
-            const selectedIndex = parseInt(seedIndex) - 1;
-            if (selectedIndex >= 0 && selectedIndex < availableSeeds.length) {
-                seedKey = availableSeeds[selectedIndex][0];
+        const comboIndex = await askQuestion(`Pilih combo dengan nomor [1-${availableCombos.length}] atau tekan Enter untuk custom: `);
+        let selectedCombo = null;
+        
+        if (comboIndex && !isNaN(parseInt(comboIndex))) {
+            const selectedIndex = parseInt(comboIndex) - 1;
+            if (selectedIndex >= 0 && selectedIndex < availableCombos.length) {
+                selectedCombo = availableCombos[selectedIndex][1];
+                console.log(`\n✅ Combo dipilih: ${selectedCombo.name}`);
+                console.log(`📝 ${selectedCombo.description}`);
+            }
+        }
+        
+        let seedKey, boosterKey, seedBuyQty, boosterBuyQty;
+        
+        if (selectedCombo && selectedCombo.seed) {
+            // Gunakan combo preset
+            seedKey = selectedCombo.seed;
+            boosterKey = selectedCombo.booster;
+            seedBuyQty = selectedCombo.seedBuyQty;
+            boosterBuyQty = selectedCombo.boosterBuyQty;
+            
+            console.log(`\n🌱 Seed: ${seedKey} (${SEEDS[seedKey]?.name || 'Unknown'})`);
+            console.log(`⚡ Booster: ${boosterKey || 'none'} (${boosterKey ? BOOSTERS[boosterKey]?.name || 'Unknown' : 'Tidak ada'})`);
+            console.log(`📦 Seed Buy Qty: ${seedBuyQty}`);
+            console.log(`📦 Booster Buy Qty: ${boosterBuyQty}`);
+            
+            const confirmCombo = await askQuestion('\nKonfirmasi combo ini? (y/n) [default: y]: ');
+            if (confirmCombo.toLowerCase() === 'n') {
+                selectedCombo = null; // Fallback ke custom
+            }
+        }
+        
+        if (!selectedCombo || !selectedCombo.seed) {
+            // Custom setup - tampilkan pilihan individual
+            console.log('\n⚙️ === CUSTOM SETUP ===');
+            
+            // Menampilkan daftar bibit yang sesuai dengan level prestige
+            console.log('\n--- Bibit Tersedia ---');
+            const availableSeeds = Object.entries(SEEDS)
+                .filter(([key, seedData]) => !seedData.prestige || seedData.prestige <= userPrestigeLevel);
+            
+            availableSeeds.forEach(([key, seedData], index) => {
+                const growTime = seedData.growSeconds ? `(${formatSeconds(seedData.growSeconds)})` : '';
+                const prestigeInfo = seedData.prestige ? ` (Prestige: ${seedData.prestige})` : '';
+                const rewardInfo = seedData.reward ? `| Reward: ${seedData.rewardCurrency === 'coins' ? '🪙' : '🍎'} ${seedData.reward}` : '';
+                console.log(`${index + 1}. ${key.padEnd(18, ' ')} ${growTime.padEnd(10, ' ')} ${rewardInfo} ${prestigeInfo}`);
+            });
+            
+            const seedIndex = await askQuestion(`\nPilih bibit dengan nomor [1-${availableSeeds.length}] [default: ${DEFAULT_SETTINGS.SEED}]: `);
+            if (seedIndex && !isNaN(parseInt(seedIndex))) {
+                const selectedIndex = parseInt(seedIndex) - 1;
+                if (selectedIndex >= 0 && selectedIndex < availableSeeds.length) {
+                    seedKey = availableSeeds[selectedIndex][0];
+                } else {
+                    seedKey = DEFAULT_SETTINGS.SEED;
+                }
             } else {
                 seedKey = DEFAULT_SETTINGS.SEED;
             }
-        } else {
-            seedKey = DEFAULT_SETTINGS.SEED;
-        }
-        
-        if (!SEEDS[seedKey]) {
-            logger.error(`Bibit '${seedKey}' tidak dikenal.`);
-            process.exit(1);
-        }
+            
+            if (!SEEDS[seedKey]) {
+                logger.error(`Bibit '${seedKey}' tidak dikenal.`);
+                process.exit(1);
+            }
 
-        // Menampilkan daftar booster yang sesuai dengan level prestige
-        console.log('\n--- Booster Tersedia ---');
-        const availableBoosters = Object.entries(BOOSTERS)
-            .filter(([key, boosterData]) => !boosterData.prestige || boosterData.prestige <= userPrestigeLevel);
-        
-        availableBoosters.forEach(([key, boosterData], index) => {
-            const prestigeInfo = boosterData.prestige ? `(Prestige: ${boosterData.prestige})` : '';
-            const effectInfo = boosterData.effect ? `| ${boosterData.effect}` : '';
-            console.log(`${index + 1}. ${key.padEnd(20, ' ')} ${effectInfo} ${prestigeInfo}`);
-        });
-        console.log(`${availableBoosters.length + 1}. none`);
-        
-        const boosterIndex = await askQuestion(`\nPilih booster dengan nomor [1-${availableBoosters.length + 1}] [default: ${DEFAULT_SETTINGS.BOOSTER}]: `);
-        let boosterKey;
-        if (boosterIndex && !isNaN(parseInt(boosterIndex))) {
-            const selectedIndex = parseInt(boosterIndex) - 1;
-            if (selectedIndex >= 0 && selectedIndex < availableBoosters.length) {
-                boosterKey = availableBoosters[selectedIndex][0];
-            } else if (selectedIndex === availableBoosters.length) {
-                boosterKey = 'none';
+            // Menampilkan daftar booster yang sesuai dengan level prestige
+            console.log('\n--- Booster Tersedia ---');
+            const availableBoosters = Object.entries(BOOSTERS)
+                .filter(([key, boosterData]) => !boosterData.prestige || boosterData.prestige <= userPrestigeLevel);
+            
+            availableBoosters.forEach(([key, boosterData], index) => {
+                const prestigeInfo = boosterData.prestige ? `(Prestige: ${boosterData.prestige})` : '';
+                const effectInfo = boosterData.effect ? `| ${boosterData.effect}` : '';
+                console.log(`${index + 1}. ${key.padEnd(20, ' ')} ${effectInfo} ${prestigeInfo}`);
+            });
+            console.log(`${availableBoosters.length + 1}. none`);
+            
+            const boosterIndex = await askQuestion(`\nPilih booster dengan nomor [1-${availableBoosters.length + 1}] [default: ${DEFAULT_SETTINGS.BOOSTER}]: `);
+            if (boosterIndex && !isNaN(parseInt(boosterIndex))) {
+                const selectedIndex = parseInt(boosterIndex) - 1;
+                if (selectedIndex >= 0 && selectedIndex < availableBoosters.length) {
+                    boosterKey = availableBoosters[selectedIndex][0];
+                } else if (selectedIndex === availableBoosters.length) {
+                    boosterKey = 'none';
+                } else {
+                    boosterKey = DEFAULT_SETTINGS.BOOSTER;
+                }
             } else {
                 boosterKey = DEFAULT_SETTINGS.BOOSTER;
             }
-        } else {
-            boosterKey = DEFAULT_SETTINGS.BOOSTER;
-        }
-        
-        if (boosterKey !== 'none' && !BOOSTERS[boosterKey]) {
-            logger.error(`Booster '${boosterKey}' tidak dikenal.`);
-            process.exit(1);
-        }
+            
+            if (boosterKey !== 'none' && !BOOSTERS[boosterKey]) {
+                logger.error(`Booster '${boosterKey}' tidak dikenal.`);
+                process.exit(1);
+            }
 
-        // Menambahkan kembali pertanyaan untuk jumlah pembelian
-        const seedBuyQtyAns = await askQuestion(`\nJumlah pembelian bibit saat habis [default: ${DEFAULT_SETTINGS.BUY_QTY_SEED}]: `);
-        const seedBuyQty = parseInt(seedBuyQtyAns, 10) || DEFAULT_SETTINGS.BUY_QTY_SEED;
+            // Menambahkan kembali pertanyaan untuk jumlah pembelian
+            const seedBuyQtyAns = await askQuestion(`\nJumlah pembelian bibit saat habis [default: ${DEFAULT_SETTINGS.BUY_QTY_SEED}]: `);
+            seedBuyQty = parseInt(seedBuyQtyAns, 10) || DEFAULT_SETTINGS.BUY_QTY_SEED;
 
-        let boosterBuyQty = DEFAULT_SETTINGS.BUY_QTY_BOOSTER;
-        if (boosterKey !== 'none') {
-            const boosterBuyQtyAns = await askQuestion(`Jumlah pembelian booster saat habis [default: ${DEFAULT_SETTINGS.BUY_QTY_BOOSTER}]: `);
-            boosterBuyQty = parseInt(boosterBuyQtyAns, 10) || DEFAULT_SETTINGS.BUY_QTY_BOOSTER;
+            boosterBuyQty = DEFAULT_SETTINGS.BUY_QTY_BOOSTER;
+            if (boosterKey !== 'none') {
+                const boosterBuyQtyAns = await askQuestion(`Jumlah pembelian booster saat habis [default: ${DEFAULT_SETTINGS.BUY_QTY_BOOSTER}]: `);
+                boosterBuyQty = parseInt(boosterBuyQtyAns, 10) || DEFAULT_SETTINGS.BUY_QTY_BOOSTER;
+            }
         }
 
         rl.close();
